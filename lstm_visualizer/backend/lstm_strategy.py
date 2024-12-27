@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
+plt.style.use('dark_background')
 import numpy as np
 import tensorflow as tf
 import os
@@ -99,19 +100,46 @@ def predict(model, X_test, y_test, X, features=['Close', 'Daily Return', '50MA',
 
     return predicted_prices_actual, y_test_actual
 
-def plot_results(ticker, actual, predicted, filename='plot.png'):
-    plt.plot(actual, label='Actual Prices', color='blue')
-    plt.plot(predicted, label='Predicted Prices', color='orange')
+def plot_results(ticker, actual, predicted, filename1='plot1.png', filename2='plot2.png'):
+    # plotting predicted vs actual prices 
+    plt.plot(actual, label='Actual Prices', color='lightblue')
+    plt.plot(predicted, label='Predicted Prices', color='violet')
     plt.title(f'{ticker} Stock Price Prediction')
     plt.xlabel('Time')
     plt.ylabel('Price')
     plt.legend()
+    plt.grid(True)
     plt.tight_layout()
 
-    plot_path = os.path.join('static', filename)
-    plt.savefig(plot_path)
+    plot_path = os.path.join('static', filename1)
+    plt.savefig(plot_path, transparent=True)
     plt.close()
-    return filename
+
+    # plotting performance metrics 
+    res = {}
+    predicted_trends = np.diff(predicted)
+    res['Signal'] = [1 if trend > 0 else 0 for trend in predicted_trends]
+    actual_df = pd.DataFrame(actual, columns=['Close'])  # Assuming y_test_actual represents 'Close' prices
+    actual_df['Daily Return'] = actual_df['Close'].pct_change()  # Calculate 'Daily Return'
+
+    actual_df['Strategy Return'] = actual_df['Daily Return'][1:] * res['Signal']
+    actual_df['Cumulative Return'] = (1 + actual_df['Daily Return']).cumprod()
+    actual_df['Cumulative Strategy Return'] = (1 + actual_df['Strategy Return']).cumprod()
+
+    plt.plot(actual_df['Cumulative Return'], label='Market Return', color='lightblue')
+    plt.plot(actual_df['Cumulative Strategy Return'], label='Strategy Return', color='lightgreen')
+    plt.title(f'{ticker} - LSTM Strategy Returns')
+    plt.xlabel('Date')
+    plt.ylabel('Cumulative Return')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    plot_path = os.path.join('static', filename2)
+    plt.savefig(plot_path, transparent=True)
+    plt.close()
+
+    return filename1, filename2
 
 def lstm_strategy(ticker, start_date, end_date, seq_length, units, epochs_num):
 

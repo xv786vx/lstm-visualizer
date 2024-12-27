@@ -24,12 +24,12 @@ def train_model():
             return jsonify({'error': 'Missing required fields.'}), 400
 
         # run lstm strategy
-        plot_filename = lstm_strategy(ticker, start_date, end_date, seq_length, units, epochs_num)
+        plot_filename1, plot_filename2 = lstm_strategy(ticker, start_date, end_date, seq_length, units, epochs_num)
 
         # return result as JSON response
         return jsonify({
-            'plot_url': f"/static/{plot_filename}",
-            # 'returns': prediction_data
+            'plot_url1': f"/static/{plot_filename1}",
+            'plot_url2': f"/static/{plot_filename2}",
         })
     except Exception as e:
         print("Error occurred:", str(e))
