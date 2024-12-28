@@ -27,7 +27,7 @@ function App() {
       epochs_num: epochsNum,
     });
 
-    const response = await fetch(`http://localhost:5000/train`, {
+    const response = await fetch(`${REACT_APP_API_URL}/train`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
