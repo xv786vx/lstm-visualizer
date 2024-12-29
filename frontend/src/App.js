@@ -11,7 +11,7 @@ function App() {
   const [plotUrl1, setPlotUrl1] = React.useState(null);
   const [plotUrl2, setPlotUrl2] = React.useState(null);
   const [loading, setLoading] = React.useState(null);
-  const REACT_APP_API_URL = "https://immense-cathi-firasaj-8a55bb9b.koyeb.app/";
+  const REACT_APP_API_URL = "https://lstm-visualizer.onrender.com";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
