@@ -8,8 +8,10 @@ app = Flask(__name__, static_folder='static')
 CORS(app) # allow requests from React frontend
 
 # route for training LSTM model
-@app.route('/train', methods=['POST'])
+@app.route('/train', methods=['POST', 'OPTIONS'])
 def train_model():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
     try:
         # parse request data
         data = request.get_json()

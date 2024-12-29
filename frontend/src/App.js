@@ -11,7 +11,7 @@ function App() {
   const [plotUrl1, setPlotUrl1] = React.useState(null);
   const [plotUrl2, setPlotUrl2] = React.useState(null);
   const [loading, setLoading] = React.useState(null);
-  const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
+  const REACT_APP_API_URL = "https://immense-cathi-firasaj-8a55bb9b.koyeb.app/";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -196,13 +196,13 @@ function App() {
             </h2>
             <div className="flex justify-center">
               <img
-                src={`http://localhost:5000${plotUrl1}?t=${new Date().getTime()}`}
+                src={`${REACT_APP_API_URL}${plotUrl1}?t=${new Date().getTime()}`}
                 alt="Stock Price Prediction 1"
                 className="mx-2 mb-4"
                 style={{ border: "none" }}
               />
               <img
-                src={`http://localhost:5000${plotUrl2}?t=${new Date().getTime()}`}
+                src={`${REACT_APP_API_URL}${plotUrl2}?t=${new Date().getTime()}`}
                 alt="Stock Price Prediction 2"
                 className="mx-2 mb-4"
                 style={{ border: "none" }}
