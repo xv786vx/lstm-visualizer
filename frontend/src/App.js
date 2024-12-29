@@ -11,7 +11,7 @@ function App() {
   const [plotUrl1, setPlotUrl1] = React.useState(null);
   const [plotUrl2, setPlotUrl2] = React.useState(null);
   const [loading, setLoading] = React.useState(null);
-  const { REACT_APP_API_URL } = process.env;
+  const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
