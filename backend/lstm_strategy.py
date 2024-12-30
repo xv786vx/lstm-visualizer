@@ -77,7 +77,7 @@ def build_model(X, y, units, epochs_num):
     model.compile(optimizer='adam', loss='mse')
     model.fit(X_train, y_train,
               validation_data=(X_test, y_test),
-              epochs=epochs_num, batch_size=32, verbose=0)
+              epochs=epochs_num, batch_size=32, verbose=1)
     print("Model built and trained!")
     return model, X_test, y_test
 
