@@ -11,13 +11,24 @@ function App() {
   const [plotUrl1, setPlotUrl1] = React.useState(null);
   const [plotUrl2, setPlotUrl2] = React.useState(null);
   const [loading, setLoading] = React.useState(null);
-  const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev";
+  // const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev"; // for deployment
+  const REACT_APP_API_URL = "http://localhost:4999";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setPlotUrl1(null);
     setPlotUrl2(null);
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const daysSpanned = (end - start) / (1000 * 60 * 60 * 24);
+
+    if (sequenceLength > daysSpanned) {
+      alert("Sequence length cannot be longer than the date range");
+      setLoading(false);
+      return;
+    }
 
     console.log("submitting", {
       ticker,
@@ -43,14 +54,31 @@ function App() {
       }),
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      setPlotUrl1(data.plot_url1);
-      setPlotUrl2(data.plot_url2);
-    } else {
-      alert("Error generating prediction. Please check inputs.");
+    if (!response.ok) {
+      alert("Error generating prediction. Please check inputs");
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    const eventSource = new EventSource(`${REACT_APP_API_URL}/train/stream`);
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.progress) {
+        setLoading(data.progress);
+      } else if (data.plot_url1 && data.plot_url2) {
+        setPlotUrl1(data.plot_url1);
+        setPlotUrl2(data.plot_url2);
+        setLoading(false);
+        eventSource.close();
+      }
+    };
+
+    eventSource.onerror = () => {
+      alert("Error generating prediction. Please check inputs");
+      setLoading(false);
+      eventSource.close();
+    };
   };
 
   return (
@@ -184,9 +212,8 @@ function App() {
       <div className="flex-1 flex flex-col items-center justify-center">
         {loading ? (
           <div className="text-center">
-            <div className="loader border-t-4 border-dashed border-blue-500 rounded-full w-16 h-16 animate-spin"></div>
             <h1 className="mt-4 text-neutral-200 font-bold text-md">
-              Loading...
+              {loading}
             </h1>
           </div>
         ) : plotUrl1 && plotUrl2 ? (

@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
+import matplotlib.dates as mdates
 plt.style.use('dark_background')
 import numpy as np
 import tensorflow as tf
@@ -100,15 +101,31 @@ def predict(model, X_test, y_test, X, features=['Close', 'Daily Return', '50MA',
 
     return predicted_prices_actual, y_test_actual
 
-def plot_results(ticker, actual, predicted, filename1='plot1.png', filename2='plot2.png'):
+def plot_results(ticker, actual, predicted, start_date, end_date, filename1='plot1.png', filename2='plot2.png'):
+    dates = pd.date_range(start=start_date, end=end_date, freq='D')
+
+    if len(dates) > len(actual):
+        dates = dates[:len(actual)]
+    elif len(dates) < len(actual):
+        actual = actual[:len(dates)]
+        predicted = predicted[:len(dates)]
+
+    print(f"Start Date: {start_date}, End Date: {end_date}")
+    print(f"Generated Dates: {len(dates)}")
+    print(f"Actual Prices: {len(actual)}")
+    print(f"Predicted Prices: {len(predicted)}")
+
     # plotting predicted vs actual prices 
-    plt.plot(actual, label='Actual Prices', color='lightblue')
-    plt.plot(predicted, label='Predicted Prices', color='violet')
+    plt.plot(dates, actual, label='Actual Prices', color='lightblue')
+    plt.plot(dates, predicted, label='Predicted Prices', color='violet')
     plt.title(f'{ticker} Stock Price Prediction')
-    plt.xlabel('Time')
+    plt.xlabel('Date')
     plt.ylabel('Price')
     plt.legend()
     plt.grid(True)
+    plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.gcf().autofmt_xdate()  # Rotate date labels to prevent overlap
     plt.tight_layout()
 
     plot_path = os.path.join('static', filename1)
@@ -126,13 +143,16 @@ def plot_results(ticker, actual, predicted, filename1='plot1.png', filename2='pl
     actual_df['Cumulative Return'] = (1 + actual_df['Daily Return']).cumprod()
     actual_df['Cumulative Strategy Return'] = (1 + actual_df['Strategy Return']).cumprod()
 
-    plt.plot(actual_df['Cumulative Return'], label='Market Return', color='lightblue')
-    plt.plot(actual_df['Cumulative Strategy Return'], label='Strategy Return', color='lightgreen')
+    plt.plot(dates, actual_df['Cumulative Return'], label='Market Return', color='lightblue')
+    plt.plot(dates, actual_df['Cumulative Strategy Return'], label='Strategy Return', color='lightgreen')
     plt.title(f'{ticker} - LSTM Strategy Returns')
     plt.xlabel('Date')
     plt.ylabel('Cumulative Return')
     plt.legend()
     plt.grid(True)
+    plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.gcf().autofmt_xdate()  # Rotate date labels to prevent overlap
     plt.tight_layout()
 
     plot_path = os.path.join('static', filename2)
@@ -150,3 +170,9 @@ def lstm_strategy(ticker, start_date, end_date, seq_length, units, epochs_num):
     plot_path = plot_results(ticker, actual_prices, predicted_prices)
     print(plot_path)
     return plot_path
+
+
+# TODO IN MORNING: CHECK IF THE DATES ARE ACTUALLY ACCURATE TO THE DATA BEING PREDICTED
+# TODO IN MORNING: REVERT DATE X-AXIS TO NUMBER OF DAYS 
+# TODO IN MORNING: ADD CONSTRAINTS TO INPUTS ON APP.JS
+# TODO IN MORNING: DEPLOY ON FLYCTL AND PUSH TO GITHUB (SO DEPLOYS ON VERCEL)
