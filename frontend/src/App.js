@@ -5,6 +5,8 @@ function App() {
   const [ticker, setTicker] = React.useState("");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
+  const [minStartDate, setMinStartDate] = React.useState("");
+  const [maxEndDate, setMaxEndDate] = React.useState("");
   const [sequenceLength, setSequenceLength] = React.useState(30);
   const [units, setUnits] = React.useState(16);
   const [epochsNum, setEpochsNum] = React.useState(5);
@@ -13,6 +15,42 @@ function App() {
   const [loading, setLoading] = React.useState(null);
   // const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev"; // for deployment
   const REACT_APP_API_URL = "http://localhost:4999";
+
+  const fetchEarliestStartDate = async (ticker) => {
+    const response = await fetch(
+      `${REACT_APP_API_URL}/earliest-start-date?ticker=${ticker}`
+    );
+    const data = await response.json();
+    return data.earliest_date;
+  };
+
+  const handleTickerChange = async (e) => {
+    const newTicker = e.target.value;
+    setTicker(newTicker);
+  };
+
+  const handleTickerBlur = async () => {
+    if (ticker) {
+      const earliestStartDate = await fetchEarliestStartDate(ticker);
+      setMinStartDate(earliestStartDate);
+      setStartDate(earliestStartDate);
+      const today = new Date().toISOString().split("T")[0];
+      setEndDate(today);
+      setMaxEndDate(today);
+    } else {
+      setMinStartDate("");
+      setStartDate("");
+      const today = new Date().toISOString().split("T")[0];
+      setEndDate(today);
+      setMaxEndDate(today);
+    }
+  };
+
+  const handleTickerKeyPress = async (e) => {
+    if (e.key === "Enter") {
+      await handleTickerBlur();
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -100,7 +138,9 @@ function App() {
               id="ticker"
               type="text"
               value={ticker}
-              onChange={(e) => setTicker(e.target.value)}
+              onChange={handleTickerChange}
+              onBlur={handleTickerBlur}
+              onKeyPress={handleTickerKeyPress}
               className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
               required
             />
@@ -118,6 +158,8 @@ function App() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              min={minStartDate}
+              max={maxEndDate}
               className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
               required
             />
@@ -135,6 +177,7 @@ function App() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
+              max={maxEndDate}
               className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
               required
             />

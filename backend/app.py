@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response
 import os
 import time
 from lstm_strategy import lstm_strategy, fetch_stock_data, create_sequences, build_model, predict, plot_results
+import yfinance as yf
 
 app = Flask(__name__)
 CORS(app)
@@ -76,6 +77,21 @@ def stream_updates():
     except Exception as e:
         print("Error occurred:", str(e))
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/earliest-start-date', methods=['GET'])
+def earliest_start_date():
+    try:
+        ticker = request.args.get('ticker').strip().upper()
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period='max')
+        earliest_date = hist.index.min().strftime('%Y-%m-%d')
+        return jsonify({'earliest_date': earliest_date}), 200
+    except Exception as e:
+        print("Error occurred:", str(e))
+        return jsonify({'error': str(e)}), 500
+
+
 
 # serve static files for plots
 @app.route('/static/<path:filename>')
