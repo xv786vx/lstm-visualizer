@@ -2,6 +2,7 @@ from flask_cors import CORS
 from flask import Flask, request, jsonify, send_from_directory, Response
 import os
 import time
+import json
 from lstm_strategy import lstm_strategy, fetch_stock_data, create_sequences, build_model, predict, plot_results
 import yfinance as yf
 
@@ -21,8 +22,8 @@ def train_model():
         start_date = data.get('start_date')
         end_date = data.get('end_date')
         seq_length = data.get('seq_length', 30)
-        units = data.get('units', 32)
-        epochs_num = data.get('epochs_num', 20)
+        units = data.get('units', 12)
+        epochs_num = data.get('epochs_num', 8)
 
         if not ticker or not start_date or not end_date:
             return jsonify({'error': 'Missing required fields.'}), 400

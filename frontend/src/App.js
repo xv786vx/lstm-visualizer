@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./App.css";
 
 function App() {
@@ -8,13 +8,21 @@ function App() {
   const [minStartDate, setMinStartDate] = React.useState("");
   const [maxEndDate, setMaxEndDate] = React.useState("");
   const [sequenceLength, setSequenceLength] = React.useState(30);
-  const [units, setUnits] = React.useState(16);
+  const [units, setUnits] = React.useState(12);
   const [epochsNum, setEpochsNum] = React.useState(5);
   const [plotUrl1, setPlotUrl1] = React.useState(null);
   const [plotUrl2, setPlotUrl2] = React.useState(null);
   const [loading, setLoading] = React.useState(null);
-  const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev"; // for deployment
-  // const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
+  // const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev"; // for deployment
+  const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
+
+  useEffect(() => {
+    const today = new Date();
+    const twoYearsAgo = new Date(today);
+    twoYearsAgo.setFullYear(today.getFullYear() - 2);
+    setStartDate(twoYearsAgo.toISOString().split("T")[0]);
+    setEndDate(today.toISOString().split("T")[0]);
+  }, []);
 
   const fetchEarliestStartDate = async (ticker) => {
     const response = await fetch(
@@ -33,7 +41,6 @@ function App() {
     if (ticker) {
       const earliestStartDate = await fetchEarliestStartDate(ticker);
       setMinStartDate(earliestStartDate);
-      setStartDate(earliestStartDate);
       const today = new Date().toISOString().split("T")[0];
       setEndDate(today);
       setMaxEndDate(today);
@@ -48,6 +55,7 @@ function App() {
 
   const handleTickerKeyPress = async (e) => {
     if (e.key === "Enter") {
+      e.preventDefault();
       await handleTickerBlur();
     }
   };
@@ -61,6 +69,12 @@ function App() {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const daysSpanned = (end - start) / (1000 * 60 * 60 * 24);
+
+    if (daysSpanned > 365 * 3) {
+      alert("Date range cannot be longer than 3 years");
+      setLoading(false);
+      return;
+    }
 
     if (sequenceLength > daysSpanned) {
       alert("Sequence length cannot be longer than the date range");
@@ -212,8 +226,8 @@ function App() {
             <input
               id="units"
               type="range"
-              min="16"
-              max="32"
+              min="4"
+              max="24"
               step="4"
               value={units}
               onChange={(e) => setUnits(parseInt(e.target.value))}
@@ -231,8 +245,8 @@ function App() {
             <input
               id="epochs-num"
               type="range"
-              min="5"
-              max="25"
+              min="3"
+              max="15"
               step="1"
               value={epochsNum}
               onChange={(e) => setEpochsNum(parseInt(e.target.value))}
