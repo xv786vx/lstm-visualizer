@@ -140,7 +140,7 @@ function App() {
               value={ticker}
               onChange={handleTickerChange}
               onBlur={handleTickerBlur}
-              onKeyPress={handleTickerKeyPress}
+              onKeyDown={handleTickerKeyPress}
               className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
               required
             />
