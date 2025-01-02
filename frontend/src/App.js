@@ -13,8 +13,8 @@ function App() {
   const [plotUrl1, setPlotUrl1] = React.useState(null);
   const [plotUrl2, setPlotUrl2] = React.useState(null);
   const [loading, setLoading] = React.useState(null);
-  // const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev"; // for deployment
-  const REACT_APP_API_URL = "http://localhost:4999";
+  const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev"; // for deployment
+  // const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
 
   const fetchEarliestStartDate = async (ticker) => {
     const response = await fetch(
