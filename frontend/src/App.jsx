@@ -11,8 +11,8 @@ function App() {
   const [loading, setLoading] = React.useState(null);
   const [error, setError] = React.useState(null);
 
-  // const REACT_APP_API_URL = "https://backend-long-water-805.fly.dev"; // for deployment
-  const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
+  const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
+  // const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
 
   // Popular stock tickers for selection
   const popularTickers = [
