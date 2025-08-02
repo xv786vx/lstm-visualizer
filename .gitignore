@@ -27,6 +27,8 @@ frontend/yarn-error.log*
 # local files
 backend/static/*
 backend/__pycache__/
+backend/venv/
+backend/multi_stock_model.keras
 
 # Python
 __pycache__/
