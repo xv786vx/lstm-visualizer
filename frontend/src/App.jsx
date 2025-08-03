@@ -2,20 +2,30 @@ import React, { useEffect } from "react";
 import "./App.css";
 
 function App() {
+  const [selectedModel, setSelectedModel] = React.useState("");
   const [selectedTickers, setSelectedTickers] = React.useState([]);
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
-  const [sequenceLength, setSequenceLength] = React.useState(30);
   const [plotUrls, setPlotUrls] = React.useState([]);
   const [metrics, setMetrics] = React.useState({});
   const [loading, setLoading] = React.useState(null);
   const [error, setError] = React.useState(null);
 
-  const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
-  // const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
+  // const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
+  const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
 
-  // Popular stock tickers for selection
-  const popularTickers = [
+  // Available model types
+  const modelTypes = [
+    {
+      value: "lstm_v2",
+      label: "LSTM v2 (50-Stock Architecture)",
+      description:
+        "Advanced LSTM with fixed 50-stock input dimensions, one-hot encoding, and optimized for S&P 500 stocks. Sequence length: 30 days.",
+    },
+  ];
+
+  // TOP 50 S&P 500 stocks (matches lstm_strategy_v2.py)
+  const TOP_50_SP500 = [
     "AAPL",
     "MSFT",
     "AMZN",
@@ -44,12 +54,36 @@ function App() {
     "PEP",
     "TMO",
     "COST",
+    "WMT",
+    "MRK",
+    "BAC",
+    "XOM",
+    "CVX",
+    "LLY",
+    "ABBV",
+    "ORCL",
+    "WFC",
+    "BMY",
+    "MDT",
+    "ACN",
+    "DHR",
+    "TXN",
+    "QCOM",
+    "HON",
+    "IBM",
+    "AMGN",
+    "UPS",
+    "LOW",
+    "SBUX",
+    "CAT",
   ];
 
   useEffect(() => {
     // Set default dates: 2020-01-01 to 2025-01-01
     setStartDate("2020-01-01");
     setEndDate("2025-01-01");
+    // Set default model
+    setSelectedModel("lstm_v2");
   }, []);
 
   const handleTickerToggle = (ticker) => {
@@ -57,8 +91,8 @@ function App() {
       if (prev.includes(ticker)) {
         return prev.filter((t) => t !== ticker);
       } else {
-        if (prev.length >= 8) {
-          setError("Maximum 8 stocks allowed");
+        if (prev.length >= 10) {
+          setError("Maximum 10 stocks allowed for optimal performance");
           setTimeout(() => setError(null), 3000);
           return prev;
         }
@@ -71,6 +105,11 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!selectedModel) {
+      setError("Please select a model type");
+      return;
+    }
+
     if (selectedTickers.length === 0) {
       setError("Please select at least one stock");
       return;
@@ -82,10 +121,10 @@ function App() {
     setError(null);
 
     console.log("submitting", {
+      model_type: selectedModel,
       tickers: selectedTickers,
       start_date: startDate,
       end_date: endDate,
-      seq_length: sequenceLength,
     });
 
     const response = await fetch(`${REACT_APP_API_URL}/train`, {
@@ -94,10 +133,10 @@ function App() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        model_type: selectedModel,
         tickers: selectedTickers,
         start_date: startDate,
         end_date: endDate,
-        seq_length: sequenceLength,
       }),
     });
 
@@ -136,7 +175,7 @@ function App() {
       {/* Left Panel */}
       <div className="w-1/3 bg-neutral-950 shadow-md px-8 pt-6 pb-8 flex flex-col">
         <h1 className="text-2xl font-bold mb-6 text-neutral-200">
-          Multi-Stock LSTM Predictor
+          LSTM Stock Predictor
         </h1>
 
         {error && (
@@ -144,97 +183,111 @@ function App() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Stock Selection */}
+          {/* Model Selection */}
           <div>
             <label className="block text-neutral-200 text-sm font-bold mb-2">
-              Select Stocks ({selectedTickers.length}/8):
+              Select Model Type:
             </label>
-            <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-              {popularTickers.map((ticker) => (
-                <button
-                  key={ticker}
-                  type="button"
-                  onClick={() => handleTickerToggle(ticker)}
-                  className={`p-2 text-xs rounded border ${
-                    selectedTickers.includes(ticker)
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-neutral-800 text-neutral-300 border-neutral-600 hover:bg-neutral-700"
-                  }`}>
-                  {ticker}
-                </button>
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="w-full p-2 bg-neutral-800 text-neutral-200 border border-neutral-600 rounded focus:outline-none focus:border-blue-500"
+              required>
+              <option value="">Choose a model...</option>
+              {modelTypes.map((model) => (
+                <option key={model.value} value={model.value}>
+                  {model.label}
+                </option>
               ))}
-            </div>
-            {selectedTickers.length > 0 && (
-              <div className="mt-2">
-                <p className="text-neutral-400 text-sm">
-                  Selected: {selectedTickers.join(", ")}
-                </p>
-              </div>
+            </select>
+            {selectedModel && (
+              <p className="text-neutral-400 text-xs mt-1">
+                {modelTypes.find((m) => m.value === selectedModel)?.description}
+              </p>
             )}
           </div>
 
-          {/* Start Date */}
-          <div>
-            <label
-              htmlFor="start-date"
-              className="block text-neutral-200 text-sm font-bold mb-2">
-              Start Date:
-            </label>
-            <input
-              id="start-date"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
-              required
-            />
-          </div>
+          {/* Stock Selection - Only show if model is selected */}
+          {selectedModel && (
+            <div>
+              <label className="block text-neutral-200 text-sm font-bold mb-2">
+                Select Stocks ({selectedTickers.length}/10):
+              </label>
+              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                {TOP_50_SP500.map((ticker) => (
+                  <button
+                    key={ticker}
+                    type="button"
+                    onClick={() => handleTickerToggle(ticker)}
+                    className={`p-2 text-xs rounded border ${
+                      selectedTickers.includes(ticker)
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-neutral-800 text-neutral-300 border-neutral-600 hover:bg-neutral-700"
+                    }`}>
+                    {ticker}
+                  </button>
+                ))}
+              </div>
+              {selectedTickers.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-neutral-400 text-sm">
+                    Selected: {selectedTickers.join(", ")}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* End Date */}
-          <div>
-            <label
-              htmlFor="end-date"
-              className="block text-neutral-200 text-sm font-bold mb-2">
-              End Date:
-            </label>
-            <input
-              id="end-date"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
-              required
-            />
-          </div>
+          {/* Date Selection - Only show if model is selected */}
+          {selectedModel && (
+            <>
+              {/* Start Date */}
+              <div>
+                <label
+                  htmlFor="start-date"
+                  className="block text-neutral-200 text-sm font-bold mb-2">
+                  Start Date:
+                </label>
+                <input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
+                  required
+                />
+              </div>
 
-          {/* Sequence Length */}
-          <div>
-            <label
-              htmlFor="sequence-length"
-              className="block text-neutral-200 text-sm font-bold mb-2 mt-8">
-              Sequence Length: {sequenceLength}
-            </label>
-            <input
-              id="sequence-length"
-              type="range"
-              min="20"
-              max="40"
-              step="5"
-              value={sequenceLength}
-              onChange={(e) => setSequenceLength(parseInt(e.target.value))}
-              className="w-full"
-            />
-          </div>
+              {/* End Date */}
+              <div>
+                <label
+                  htmlFor="end-date"
+                  className="block text-neutral-200 text-sm font-bold mb-2">
+                  End Date:
+                </label>
+                <input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
+                  required
+                />
+              </div>
+            </>
+          )}
 
           {/* Submit Button */}
           <div>
             <button
               type="submit"
-              disabled={selectedTickers.length === 0}
+              disabled={!selectedModel || selectedTickers.length === 0}
               className="bg-neutral-300 hover:bg-neutral-100 disabled:bg-neutral-700 disabled:text-neutral-500 mt-8 text-black font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
-              {selectedTickers.length === 0
-                ? "Select Stocks First"
-                : "Generate Predictions"}
+              {!selectedModel
+                ? "Select Model First"
+                : selectedTickers.length === 0
+                  ? "Select Stocks First"
+                  : "Generate Predictions"}
             </button>
           </div>
         </form>

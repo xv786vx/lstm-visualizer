@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response
 import os
 import time
 import json
-from lstm_strategy_Vertige import LSTMStockPredictor
+from lstm_strategy_v2 import LSTMStockPredictor
 import yfinance as yf
 
 app = Flask(__name__)
@@ -55,26 +55,18 @@ def stream_updates():
         def generate():
             global predictor
             
-            yield 'data: {"progress": "Initializing LSTM predictor..."}\n\n'
+            yield 'data: {"progress": "Initializing LSTM v2 predictor..."}\n\n'
             time.sleep(1)
-            predictor = LSTMStockPredictor('multi_stock_model.keras', seq_length)
+            predictor = LSTMStockPredictor('models/lstm_50_stocks_model.keras', seq_length)
             
-            yield 'data: {"progress": "Fetching stock data..."}\n\n'
+            yield 'data: {"progress": "Training/Loading 50-stock model..."}\n\n'
             time.sleep(1)
-            data = predictor.fetch_and_prepare_data(tickers, start_date, end_date)
             
-            yield 'data: {"progress": "Normalizing data..."}\n\n'
+            yield 'data: {"progress": "Training/Loading 50-stock model..."}\n\n'
             time.sleep(1)
-            normalized_data = predictor.normalize_data(data)
             
-            yield 'data: {"progress": "Creating sequences..."}\n\n'
-            time.sleep(1)
-            X, y, _ = predictor.create_sequences(normalized_data, tickers)
-            
-            yield 'data: {"progress": "Training model..."}\n\n'
-            time.sleep(1)
-            predictor.training_tickers = tickers
-            X_test, y_test = predictor.train_save_model(X, y, tickers)
+            # For v2, train on all 50 stocks if needed (model will reuse existing if compatible)
+            X_test, y_test = predictor.train_model_on_all_50_stocks(start_date, end_date)
             
             yield 'data: {"progress": "Generating backtest results..."}\n\n'
             time.sleep(1)
