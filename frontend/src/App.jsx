@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import "./App.css";
 
 function App() {
@@ -10,6 +10,8 @@ function App() {
   const [metrics, setMetrics] = React.useState({});
   const [loading, setLoading] = React.useState(null);
   const [error, setError] = React.useState(null);
+  const [isConnecting, setIsConnecting] = React.useState(true);
+  const [connectionError, setConnectionError] = React.useState(false);
 
   // const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
   const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
@@ -78,13 +80,42 @@ function App() {
     "CAT",
   ];
 
+  const checkBackendHealth = useCallback(async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(`${REACT_APP_API_URL}/health`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        setIsConnecting(false);
+        setConnectionError(false);
+      } else {
+        throw new Error("Backend not responding");
+      }
+    } catch (error) {
+      console.log("Backend not ready, retrying in 3 seconds...");
+      setConnectionError(true);
+      // Retry after 3 seconds
+      setTimeout(checkBackendHealth, 3000);
+    }
+  }, [REACT_APP_API_URL]);
+
   useEffect(() => {
+    // Check backend health on component mount
+    checkBackendHealth();
+
     // Set default dates: 2020-01-01 to 2025-01-01
     setStartDate("2020-01-01");
     setEndDate("2025-01-01");
     // Set default model
     setSelectedModel("lstm_v2");
-  }, []);
+  }, [checkBackendHealth]);
 
   const handleTickerToggle = (ticker) => {
     setSelectedTickers((prev) => {
@@ -104,6 +135,11 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isConnecting) {
+      setError("Still connecting to backend. Please wait...");
+      return;
+    }
 
     if (!selectedModel) {
       setError("Please select a model type");
@@ -191,7 +227,8 @@ function App() {
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full p-2 bg-neutral-800 text-neutral-200 border border-neutral-600 rounded focus:outline-none focus:border-blue-500"
+              disabled={isConnecting}
+              className="w-full p-2 bg-neutral-800 text-neutral-200 border border-neutral-600 rounded focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               required>
               <option value="">Choose a model...</option>
               {modelTypes.map((model) => (
@@ -219,7 +256,8 @@ function App() {
                     key={ticker}
                     type="button"
                     onClick={() => handleTickerToggle(ticker)}
-                    className={`p-2 text-xs rounded border ${
+                    disabled={isConnecting}
+                    className={`p-2 text-xs rounded border disabled:opacity-50 disabled:cursor-not-allowed ${
                       selectedTickers.includes(ticker)
                         ? "bg-blue-600 text-white border-blue-600"
                         : "bg-neutral-800 text-neutral-300 border-neutral-600 hover:bg-neutral-700"
@@ -253,7 +291,8 @@ function App() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
+                  disabled={isConnecting}
+                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   required
                 />
               </div>
@@ -270,7 +309,8 @@ function App() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent"
+                  disabled={isConnecting}
+                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   required
                 />
               </div>
@@ -281,13 +321,17 @@ function App() {
           <div>
             <button
               type="submit"
-              disabled={!selectedModel || selectedTickers.length === 0}
+              disabled={
+                isConnecting || !selectedModel || selectedTickers.length === 0
+              }
               className="bg-neutral-300 hover:bg-neutral-100 disabled:bg-neutral-700 disabled:text-neutral-500 mt-8 text-black font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
-              {!selectedModel
+              {isConnecting
+                ? "Connecting to Backend..."
+                : !selectedModel
                 ? "Select Model First"
                 : selectedTickers.length === 0
-                  ? "Select Stocks First"
-                  : "Generate Predictions"}
+                ? "Select Stocks First"
+                : "Generate Predictions"}
             </button>
           </div>
         </form>
@@ -295,7 +339,24 @@ function App() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col p-8">
-        {loading ? (
+        {isConnecting ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="spinner mb-6"></div>
+              <h2 className="text-xl font-semibold text-neutral-200 mb-2">
+                Connecting to Backend...
+              </h2>
+              <p className="text-neutral-400">
+                This may take a moment while the server starts up
+              </p>
+              {connectionError && (
+                <p className="text-yellow-400 text-sm mt-2">
+                  Retrying connection...
+                </p>
+              )}
+            </div>
+          </div>
+        ) : loading ? (
           <div className="text-center">
             <h1 className="mt-4 text-neutral-200 font-bold text-lg">
               {loading}
@@ -346,14 +407,22 @@ function App() {
                               <p className="text-neutral-300">
                                 Strategy Return:{" "}
                                 <span
-                                  className={`font-bold ${tickerMetrics.total_return >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                  className={`font-bold ${
+                                    tickerMetrics.total_return >= 0
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}>
                                   {tickerMetrics.total_return.toFixed(2)}%
                                 </span>
                               </p>
                               <p className="text-neutral-300">
                                 Buy & Hold Return:{" "}
                                 <span
-                                  className={`font-bold ${tickerMetrics.market_return >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                  className={`font-bold ${
+                                    tickerMetrics.market_return >= 0
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}>
                                   {tickerMetrics.market_return.toFixed(2)}%
                                 </span>
                               </p>
@@ -384,7 +453,13 @@ function App() {
                                 <p className="text-neutral-400 text-xs">
                                   vs Buy & Hold:{" "}
                                   <span
-                                    className={`font-bold ${tickerMetrics.total_return - tickerMetrics.market_return >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                    className={`font-bold ${
+                                      tickerMetrics.total_return -
+                                        tickerMetrics.market_return >=
+                                      0
+                                        ? "text-green-400"
+                                        : "text-red-400"
+                                    }`}>
                                     {tickerMetrics.total_return >
                                     tickerMetrics.market_return
                                       ? "+"
