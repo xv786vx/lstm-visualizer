@@ -85,7 +85,10 @@ class LSTMStockPredictor:
                 with open(self.model_metadata_path, 'r') as f:
                     metadata = json.load(f)
                     self.training_tickers = metadata.get('training_tickers', [])
+                    self.training_start_date = metadata.get('training_start_date')
+                    self.training_end_date = metadata.get('training_end_date')
                     print(f"Found existing model trained on: {self.training_tickers}")
+                    print(f"Training date range: {self.training_start_date} to {self.training_end_date}")
                     
                 self.model = load_model(self.model_path)
                 print(f"Loaded existing model from {self.model_path}")
@@ -95,6 +98,8 @@ class LSTMStockPredictor:
         else:
             self.model = None
             self.training_tickers = None
+            self.training_start_date = None
+            self.training_end_date = None
 
     def _clear_model(self):
         """Clear existing model and metadata files"""
@@ -106,14 +111,18 @@ class LSTMStockPredictor:
             print(f"Removed model metadata: {self.model_metadata_path}")
         self.model = None
         self.training_tickers = None
+        self.training_start_date = None
+        self.training_end_date = None
 
-    def _save_model_metadata(self, tickers):
-        """Save metadata about the model including training tickers"""
+    def _save_model_metadata(self, tickers, start_date=None, end_date=None):
+        """Save metadata about the model including training tickers and date range"""
         import json
         metadata = {
             'training_tickers': sorted(tickers),  # Sort for consistent comparison
             'seq_length': self.seq_length,
             'features': self.features,
+            'training_start_date': start_date,
+            'training_end_date': end_date,
             'created_at': str(pd.Timestamp.now())
         }
         with open(self.model_metadata_path, 'w') as f:
@@ -125,6 +134,35 @@ class LSTMStockPredictor:
         if self.training_tickers is None:
             return False
         return sorted(new_tickers) == sorted(self.training_tickers)
+
+    def _date_range_compatible(self, start_date, end_date):
+        """Check if requested date range is within the model's training date range"""
+        if not self.training_start_date or not self.training_end_date:
+            return False
+        
+        try:
+            train_start = pd.Timestamp(self.training_start_date)
+            train_end = pd.Timestamp(self.training_end_date)
+            req_start = pd.Timestamp(start_date)
+            req_end = pd.Timestamp(end_date)
+            
+            # Requested range must be within training range
+            return req_start >= train_start and req_end <= train_end
+        except Exception as e:
+            print(f"Error validating date range: {e}")
+            return False
+
+    def can_predict_without_training(self, tickers, start_date, end_date):
+        """Check if we can make predictions without retraining"""
+        if self.model is None:
+            return False
+        
+        # Check if tickers match exactly
+        if not self._tickers_match(tickers):
+            return False
+            
+        # Check if date range is compatible
+        return self._date_range_compatible(start_date, end_date)
 
 
     def fetch_and_prepare_data(self, tickers, start_date, end_date):
@@ -198,6 +236,17 @@ class LSTMStockPredictor:
       """Train and save the LSTM model"""
       print("\nChecking model compatibility...")
       
+      # Check if we can skip training by using existing model
+      if self.can_predict_without_training(tickers,
+                                          getattr(self, '_current_start_date', None),
+                                          getattr(self, '_current_end_date', None)):
+          print("Using existing pre-trained model - skipping training!")
+          # Still need to return test data for validation
+          split_idx = int(len(X) * 0.8)
+          X_train, X_test = X[:split_idx], X[split_idx:]
+          y_train, y_test = y[:split_idx], y[split_idx:]
+          return X_test, y_test
+      
       # Check if we need to retrain
       if not self._tickers_match(tickers):
           if self.training_tickers is not None:
@@ -231,7 +280,9 @@ class LSTMStockPredictor:
           self.model.fit(X_train, y_train, epochs=20, batch_size=32, validation_split=0.2)
           self.model.save(self.model_path)
           self.training_tickers = sorted(tickers)
-          self._save_model_metadata(tickers)
+          self._save_model_metadata(tickers,
+                                   getattr(self, '_current_start_date', None),
+                                   getattr(self, '_current_end_date', None))
           print(f"Model saved to {self.model_path}")
 
       return X_test, y_test

@@ -12,9 +12,16 @@ function App() {
   const [error, setError] = React.useState(null);
   const [isConnecting, setIsConnecting] = React.useState(true);
   const [connectionError, setConnectionError] = React.useState(false);
+  const [modelCompatibility, setModelCompatibility] = React.useState(null);
+  const [startupProgress, setStartupProgress] = React.useState({
+    current_step: "Connecting to backend...",
+    progress_percent: 0,
+    steps_completed: 0,
+    total_steps: 6,
+  });
 
-  // const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
-  const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
+  const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
+  // const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
 
   // Available model types
   const modelTypes = [
@@ -23,6 +30,12 @@ function App() {
       label: "LSTM v2 (50-Stock Architecture)",
       description:
         "Advanced LSTM with fixed 50-stock input dimensions, one-hot encoding, and optimized for S&P 500 stocks. Sequence length: 30 days.",
+    },
+    {
+      value: "lstm_vertige",
+      label: "LSTM Vertige (7-Stock Architecture)",
+      description:
+        "Original LSTM model with 7 specific stocks, technical indicators, and portfolio backtesting. Sequence length: 30 days.",
     },
   ];
 
@@ -80,10 +93,97 @@ function App() {
     "CAT",
   ];
 
+  // Vertige model stocks (matches lstm_strategy_Vertige.py)
+  const VERTIGE_STOCKS = [
+    "AAPL",
+    "MSFT",
+    "AMZN",
+    "GOOGL",
+    "NVDA",
+    "TSLA",
+    "META",
+  ];
+
+  // Get available stocks based on selected model
+  const getAvailableStocks = () => {
+    if (selectedModel === "lstm_vertige") {
+      return VERTIGE_STOCKS;
+    } else if (selectedModel === "lstm_v2") {
+      return TOP_50_SP500;
+    }
+    return [];
+  };
+
+  // Get maximum stock selection based on model
+  const getMaxStocks = () => {
+    if (selectedModel === "lstm_vertige") {
+      return 7; // All 7 stocks for Vertige
+    } else if (selectedModel === "lstm_v2") {
+      return 10; // Up to 10 stocks for v2
+    }
+    return 0;
+  };
+
+  const listenToStartupProgress = useCallback(() => {
+    const eventSource = new EventSource(
+      `${REACT_APP_API_URL}/startup-progress`
+    );
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setStartupProgress(data);
+
+      if (data.is_ready) {
+        setIsConnecting(false);
+        setConnectionError(false);
+        eventSource.close();
+      }
+    };
+
+    eventSource.onerror = () => {
+      console.log("Startup progress stream error, falling back to polling");
+      eventSource.close();
+      // Fall back to polling health endpoint with a simple function
+      setTimeout(() => {
+        // Simple health check without calling the callback to avoid dependency
+        fetch(`${REACT_APP_API_URL}/health`)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.ready) {
+              setIsConnecting(false);
+              setConnectionError(false);
+            } else {
+              setConnectionError(true);
+              // Keep trying
+              setTimeout(() => {
+                fetch(`${REACT_APP_API_URL}/health`)
+                  .then((r) => r.json())
+                  .then((d) => {
+                    if (d.ready) {
+                      setIsConnecting(false);
+                      setConnectionError(false);
+                    }
+                  })
+                  .catch(() => {});
+              }, 3000);
+            }
+          })
+          .catch(() => {
+            setConnectionError(true);
+          });
+      }, 3000);
+    };
+
+    // Cleanup on unmount
+    return () => {
+      eventSource.close();
+    };
+  }, [REACT_APP_API_URL]);
+
   const checkBackendHealth = useCallback(async () => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
       const response = await fetch(`${REACT_APP_API_URL}/health`, {
         method: "GET",
@@ -93,18 +193,47 @@ function App() {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        setIsConnecting(false);
-        setConnectionError(false);
+        const data = await response.json();
+
+        if (data.ready) {
+          // Backend is fully ready
+          setIsConnecting(false);
+          setConnectionError(false);
+          setStartupProgress({
+            current_step: "Backend ready!",
+            progress_percent: 100,
+            steps_completed: data.total_steps || 6,
+            total_steps: data.total_steps || 6,
+          });
+        } else {
+          // Backend is initializing, start listening to progress
+          setConnectionError(false);
+          setStartupProgress({
+            current_step: data.current_step || "Initializing...",
+            progress_percent: data.progress_percent || 0,
+            steps_completed: data.steps_completed || 0,
+            total_steps: data.total_steps || 6,
+          });
+
+          // Start listening to startup progress stream
+          listenToStartupProgress();
+        }
       } else {
         throw new Error("Backend not responding");
       }
     } catch (error) {
-      console.log("Backend not ready, retrying in 3 seconds...");
+      console.log("Backend not ready, retrying in 5 seconds...");
       setConnectionError(true);
-      // Retry after 3 seconds
-      setTimeout(checkBackendHealth, 3000);
+      setStartupProgress({
+        current_step: "Connecting to backend...",
+        progress_percent: 0,
+        steps_completed: 0,
+        total_steps: 6,
+      });
+      // Retry after 5 seconds
+      setTimeout(checkBackendHealth, 5000);
     }
-  }, [REACT_APP_API_URL]);
+  }, [REACT_APP_API_URL, listenToStartupProgress]);
 
   useEffect(() => {
     // Check backend health on component mount
@@ -117,13 +246,24 @@ function App() {
     setSelectedModel("lstm_v2");
   }, [checkBackendHealth]);
 
+  // Clear selected tickers when model changes
+  useEffect(() => {
+    setSelectedTickers([]);
+    setError(null);
+  }, [selectedModel]);
+
   const handleTickerToggle = (ticker) => {
+    const maxStocks = getMaxStocks();
+    const modelName = selectedModel === "lstm_vertige" ? "Vertige" : "v2";
+
     setSelectedTickers((prev) => {
       if (prev.includes(ticker)) {
         return prev.filter((t) => t !== ticker);
       } else {
-        if (prev.length >= 10) {
-          setError("Maximum 10 stocks allowed for optimal performance");
+        if (prev.length >= maxStocks) {
+          setError(
+            `Maximum ${maxStocks} stocks allowed for ${modelName} model`
+          );
           setTimeout(() => setError(null), 3000);
           return prev;
         }
@@ -132,6 +272,51 @@ function App() {
     });
     setError(null);
   };
+
+  // Check compatibility when relevant parameters change
+  React.useEffect(() => {
+    const checkCompatibility = async () => {
+      if (
+        !selectedModel ||
+        selectedTickers.length === 0 ||
+        !startDate ||
+        !endDate
+      ) {
+        setModelCompatibility(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${REACT_APP_API_URL}/model/compatibility`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model_type: selectedModel,
+              tickers: selectedTickers,
+              start_date: startDate,
+              end_date: endDate,
+              seq_length: selectedModel === "lstm_vertige" ? 30 : 30, // Both use 30
+            }),
+          }
+        );
+
+        if (response.ok) {
+          const compatibility = await response.json();
+          setModelCompatibility(compatibility);
+        }
+      } catch (error) {
+        console.log("Could not check model compatibility:", error);
+        setModelCompatibility(null);
+      }
+    };
+
+    const timeoutId = setTimeout(checkCompatibility, 500); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [selectedModel, selectedTickers, startDate, endDate, REACT_APP_API_URL]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -178,9 +363,22 @@ function App() {
 
     if (!response.ok) {
       const errorData = await response.json();
-      setError(
-        errorData.error || "Error generating prediction. Please check inputs"
-      );
+
+      if (response.status === 503) {
+        // Backend is still initializing
+        setError(
+          `Backend is still initializing: ${
+            errorData.current_step || "Please wait..."
+          }`
+        );
+        setIsConnecting(true); // Go back to connecting state
+        // Start checking backend health again
+        setTimeout(checkBackendHealth, 2000);
+      } else {
+        setError(
+          errorData.error || "Error generating prediction. Please check inputs"
+        );
+      }
       setLoading(false);
       return;
     }
@@ -207,151 +405,234 @@ function App() {
   };
 
   return (
-    <div className="flex min-h-screen bg-neutral-900">
+    <div className="flex h-screen bg-neutral-900 overflow-hidden">
       {/* Left Panel */}
-      <div className="w-1/3 bg-neutral-950 shadow-md px-8 pt-6 pb-8 flex flex-col">
-        <h1 className="text-2xl font-bold mb-6 text-neutral-200">
-          LSTM Stock Predictor
-        </h1>
+      <div className="w-1/3 bg-neutral-950 shadow-md flex flex-col h-screen">
+        <div className="px-8 pt-6 pb-4 flex-shrink-0">
+          <h1 className="text-2xl font-bold mb-4 text-neutral-200">
+            LSTM Stock Predictor
+          </h1>
 
-        {error && (
-          <div className="bg-red-500 text-white p-3 rounded mb-4">{error}</div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Model Selection */}
-          <div>
-            <label className="block text-neutral-200 text-sm font-bold mb-2">
-              Select Model Type:
-            </label>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              disabled={isConnecting}
-              className="w-full p-2 bg-neutral-800 text-neutral-200 border border-neutral-600 rounded focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              required>
-              <option value="">Choose a model...</option>
-              {modelTypes.map((model) => (
-                <option key={model.value} value={model.value}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
-            {selectedModel && (
-              <p className="text-neutral-400 text-xs mt-1">
-                {modelTypes.find((m) => m.value === selectedModel)?.description}
-              </p>
-            )}
-          </div>
-
-          {/* Stock Selection - Only show if model is selected */}
-          {selectedModel && (
-            <div>
-              <label className="block text-neutral-200 text-sm font-bold mb-2">
-                Select Stocks ({selectedTickers.length}/10):
-              </label>
-              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                {TOP_50_SP500.map((ticker) => (
-                  <button
-                    key={ticker}
-                    type="button"
-                    onClick={() => handleTickerToggle(ticker)}
-                    disabled={isConnecting}
-                    className={`p-2 text-xs rounded border disabled:opacity-50 disabled:cursor-not-allowed ${
-                      selectedTickers.includes(ticker)
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-neutral-800 text-neutral-300 border-neutral-600 hover:bg-neutral-700"
-                    }`}>
-                    {ticker}
-                  </button>
-                ))}
-              </div>
-              {selectedTickers.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-neutral-400 text-sm">
-                    Selected: {selectedTickers.join(", ")}
-                  </p>
-                </div>
-              )}
+          {error && (
+            <div className="bg-red-500 text-white p-3 rounded mb-4">
+              {error}
             </div>
           )}
+        </div>
 
-          {/* Date Selection - Only show if model is selected */}
-          {selectedModel && (
-            <>
-              {/* Start Date */}
-              <div>
-                <label
-                  htmlFor="start-date"
-                  className="block text-neutral-200 text-sm font-bold mb-2">
-                  Start Date:
+        <div className="flex-1 overflow-y-auto px-8 scrollbar-thin scrollbar-thumb-neutral-600 scrollbar-track-neutral-800">
+          <form onSubmit={handleSubmit} className="space-y-4 pb-6">
+            {/* Model Selection */}
+            <div>
+              <label className="block text-neutral-200 text-sm font-bold mb-2">
+                Select Model Type:
+              </label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                disabled={isConnecting}
+                className="w-full p-2 bg-neutral-800 text-neutral-200 border border-neutral-600 rounded focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                required>
+                <option value="">Choose a model...</option>
+                {modelTypes.map((model) => (
+                  <option key={model.value} value={model.value}>
+                    {model.label}
+                  </option>
+                ))}
+              </select>
+              {selectedModel && (
+                <p className="text-neutral-400 text-xs mt-1">
+                  {
+                    modelTypes.find((m) => m.value === selectedModel)
+                      ?.description
+                  }
+                </p>
+              )}
+            </div>
+
+            {/* Stock Selection - Only show if model is selected */}
+            {selectedModel && (
+              <div className="flex-1 min-h-0">
+                <label className="block text-neutral-200 text-sm font-bold mb-2">
+                  Select Stocks ({selectedTickers.length}/{getMaxStocks()}):
+                  <span className="text-neutral-400 text-xs block mt-1">
+                    {selectedModel === "lstm_vertige"
+                      ? "Choose from the 7 pre-trained Vertige stocks"
+                      : "Choose up to 10 stocks from the top 50 S&P 500"}
+                  </span>
                 </label>
-                <input
-                  id="start-date"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  disabled={isConnecting}
-                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                  required
-                />
+                <div className="grid grid-cols-3 gap-1 h-40 overflow-y-auto border border-neutral-600 rounded p-2 bg-neutral-800 scrollbar-thin scrollbar-thumb-neutral-600 scrollbar-track-neutral-800">
+                  {getAvailableStocks().map((ticker) => (
+                    <button
+                      key={ticker}
+                      type="button"
+                      onClick={() => handleTickerToggle(ticker)}
+                      disabled={isConnecting}
+                      className={`py-1.5 px-2 text-xs rounded border disabled:opacity-50 disabled:cursor-not-allowed text-center ${
+                        selectedTickers.includes(ticker)
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-neutral-700 text-neutral-300 border-neutral-600 hover:bg-neutral-600"
+                      }`}>
+                      {ticker}
+                    </button>
+                  ))}
+                </div>
+                {selectedTickers.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-neutral-400 text-sm">
+                      Selected: {selectedTickers.join(", ")}
+                    </p>
+                  </div>
+                )}
               </div>
+            )}
 
-              {/* End Date */}
-              <div>
-                <label
-                  htmlFor="end-date"
-                  className="block text-neutral-200 text-sm font-bold mb-2">
-                  End Date:
-                </label>
-                <input
-                  id="end-date"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  disabled={isConnecting}
-                  className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                  required
-                />
-              </div>
-            </>
-          )}
+            {/* Date Selection - Only show if model is selected */}
+            {selectedModel && (
+              <>
+                {/* Start Date */}
+                <div className="flex-shrink-0">
+                  <label
+                    htmlFor="start-date"
+                    className="block text-neutral-200 text-sm font-bold mb-2">
+                    Start Date:
+                  </label>
+                  <input
+                    id="start-date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    disabled={isConnecting}
+                    className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                    required
+                  />
+                </div>
 
-          {/* Submit Button */}
-          <div>
-            <button
-              type="submit"
-              disabled={
-                isConnecting || !selectedModel || selectedTickers.length === 0
-              }
-              className="bg-neutral-300 hover:bg-neutral-100 disabled:bg-neutral-700 disabled:text-neutral-500 mt-8 text-black font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
-              {isConnecting
-                ? "Connecting to Backend..."
-                : !selectedModel
-                ? "Select Model First"
-                : selectedTickers.length === 0
-                ? "Select Stocks First"
-                : "Generate Predictions"}
-            </button>
-          </div>
-        </form>
+                {/* End Date */}
+                <div className="flex-shrink-0">
+                  <label
+                    htmlFor="end-date"
+                    className="block text-neutral-200 text-sm font-bold mb-2">
+                    End Date:
+                  </label>
+                  <input
+                    id="end-date"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    disabled={isConnecting}
+                    className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                    required
+                  />
+                </div>
+
+                {/* Model Compatibility Status */}
+                {modelCompatibility && (
+                  <div className="col-span-2 mt-4">
+                    {modelCompatibility.compatible ? (
+                      <div className="bg-green-800/30 border border-green-500 text-green-200 px-3 py-2 rounded text-sm">
+                        ✅ <strong>Existing model can be used!</strong> No
+                        training required - predictions will be much faster.
+                        {modelCompatibility.training_start_date && (
+                          <div className="text-xs mt-1">
+                            Model trained on:{" "}
+                            {modelCompatibility.training_start_date} to{" "}
+                            {modelCompatibility.training_end_date}
+                          </div>
+                        )}
+                      </div>
+                    ) : modelCompatibility.model_exists ? (
+                      <div className="bg-yellow-800/30 border border-yellow-500 text-yellow-200 px-3 py-2 rounded text-sm">
+                        ⚠️ <strong>Model exists but needs retraining</strong>
+                        {modelCompatibility.incompatibility_reasons && (
+                          <div className="text-xs mt-1">
+                            {modelCompatibility.incompatibility_reasons.map(
+                              (reason, idx) => (
+                                <div key={idx}>• {reason}</div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-blue-800/30 border border-blue-500 text-blue-200 px-3 py-2 rounded text-sm">
+                        ℹ️ <strong>No existing model found</strong> - New model
+                        will be trained for your selection.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </form>
+        </div>
+
+        {/* Submit Button - Fixed at bottom */}
+        <div className="px-8 py-4 flex-shrink-0 border-t border-neutral-700">
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={
+              isConnecting || !selectedModel || selectedTickers.length === 0
+            }
+            className="bg-neutral-300 hover:bg-neutral-100 disabled:bg-neutral-700 disabled:text-neutral-500 text-black font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+            {isConnecting
+              ? `Backend Initializing... (${startupProgress.progress_percent}%)`
+              : !selectedModel
+              ? "Select Model First"
+              : selectedTickers.length === 0
+              ? `Select ${
+                  selectedModel === "lstm_vertige" ? "Vertige" : "V2"
+                } Stocks First`
+              : "Generate Predictions"}
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col p-8">
+      <div className="flex-1 flex flex-col p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-600 scrollbar-track-neutral-800">
         {isConnecting ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="spinner mb-6"></div>
-              <h2 className="text-xl font-semibold text-neutral-200 mb-2">
-                Connecting to Backend...
+            <div className="text-center max-w-md">
+              <div className="spinner mb-10"></div>
+
+              <h2 className="text-xl font-semibold text-neutral-200 mb-4">
+                {connectionError
+                  ? "Connecting to Backend..."
+                  : "Initializing Backend"}
               </h2>
-              <p className="text-neutral-400">
-                This may take a moment while the server starts up
+
+              {!connectionError && (
+                <div className="mb-4">
+                  <div className="bg-neutral-700 rounded-full h-3 mb-2">
+                    <div
+                      className="bg-blue-500 h-3 rounded-full transition-all duration-300 ease-out"
+                      style={{
+                        width: `${startupProgress.progress_percent}%`,
+                      }}></div>
+                  </div>
+
+                  <p className="text-neutral-300 text-sm mb-2">
+                    {startupProgress.current_step}
+                  </p>
+
+                  <p className="text-neutral-400 text-xs">
+                    Step {startupProgress.steps_completed} of{" "}
+                    {startupProgress.total_steps}(
+                    {startupProgress.progress_percent}%)
+                  </p>
+                </div>
+              )}
+
+              <p className="text-neutral-400 text-sm">
+                {connectionError
+                  ? "Attempting to connect to the server..."
+                  : "This may take up to 3-4 minutes on first startup"}
               </p>
+
               {connectionError && (
-                <p className="text-yellow-400 text-sm mt-2">
-                  Retrying connection...
+                <p className="text-yellow-400 text-xs mt-2">
+                  The server may be starting up. Please wait...
                 </p>
               )}
             </div>

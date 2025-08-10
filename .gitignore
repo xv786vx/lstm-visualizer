@@ -28,7 +28,10 @@ frontend/yarn-error.log*
 backend/static/*
 backend/__pycache__/
 backend/venv/
-backend/models/
+
+# Allow pre-trained model files for deployment
+!backend/models/*.keras
+!backend/models/*.json
 
 
 # Python
