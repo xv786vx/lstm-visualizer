@@ -298,11 +298,18 @@ def health_check():
 def startup_progress():
     def generate():
         while not startup_status['is_ready']:
-            yield f"data: {json.dumps(startup_status)}\n\n"
+            # Create a JSON-serializable copy of startup_status
+            status_copy = startup_status.copy()
+            if 'start_time' in status_copy:
+                status_copy['start_time'] = status_copy['start_time'].isoformat()
+            yield f"data: {json.dumps(status_copy)}\n\n"
             time.sleep(1)  # Send update every second
         
         # Send final ready status
-        yield f"data: {json.dumps(startup_status)}\n\n"
+        status_copy = startup_status.copy()
+        if 'start_time' in status_copy:
+            status_copy['start_time'] = status_copy['start_time'].isoformat()
+        yield f"data: {json.dumps(status_copy)}\n\n"
     
     return Response(generate(), content_type='text/event-stream', headers={
         'Cache-Control': 'no-cache',
