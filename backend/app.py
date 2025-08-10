@@ -282,6 +282,15 @@ def check_model_compatibility():
 
 @app.route('/health')
 def health_check():
+    import os
+    model_files_exist = {
+        'v2_model': os.path.exists('models/lstm_50_stocks_model.keras'),
+        'v2_metadata': os.path.exists('models/lstm_50_stocks_model_metadata.json'),
+        'vertige_model': os.path.exists('models/lstm_vertige_model.keras'),
+        'vertige_metadata': os.path.exists('models/lstm_vertige_model_metadata.json'),
+        'models_dir': os.path.exists('models')
+    }
+    
     return jsonify({
         'status': 'healthy' if startup_status['is_ready'] else 'initializing',
         'service': 'lstm-visualizer-backend',
@@ -290,7 +299,8 @@ def health_check():
         'current_step': startup_status['current_step'],
         'progress_percent': startup_status['progress_percent'],
         'steps_completed': startup_status['steps_completed'],
-        'total_steps': startup_status['total_steps']
+        'total_steps': startup_status['total_steps'],
+        'model_files': model_files_exist
     }), 200
 
 # Startup progress streaming endpoint
