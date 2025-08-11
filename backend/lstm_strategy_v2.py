@@ -324,29 +324,14 @@ class LSTMStockPredictor:
           print(f"Input shape: {X.shape}")
           print(f"Expected input shape: [batch_size, {self.seq_length}, 58] (8 features + 50 one-hot)")
 
-          # Fixed input shape: [batch_size, seq_length, 58] (8 features + 50 one-hot)
-          # Use explicit layer creation to avoid TensorFlow compatibility issues
-          
-          # Create input layer explicitly
-          inputs = Input(shape=(self.seq_length, 58))
-          
-          # Create LSTM layers with explicit configuration
-          x = LSTM(64, return_sequences=True, 
-                  recurrent_dropout=0.0, 
-                  dropout=0.0,
-                  stateful=False,
-                  unroll=False)(inputs)
-          x = Dropout(0.2)(x)
-          x = LSTM(32, return_sequences=False,
-                  recurrent_dropout=0.0,
-                  dropout=0.0,
-                  stateful=False,
-                  unroll=False)(x)
-          x = Dropout(0.2)(x)
-          x = Dense(16, activation='relu')(x)
-          outputs = Dense(1)(x)
-          
-          self.model = Model(inputs=inputs, outputs=outputs)
+          self.model = Sequential([
+              LSTM(64, return_sequences=True, input_shape=(self.seq_length, 58)),
+              Dropout(0.2),
+              LSTM(32, return_sequences=False),
+              Dropout(0.2),
+              Dense(16, activation='relu'),
+              Dense(1)
+          ])
           self.model.compile(optimizer='adam', loss='mse')
 
           # Train model
