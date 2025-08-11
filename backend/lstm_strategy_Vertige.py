@@ -29,8 +29,8 @@ import random
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.models import Sequential, load_model, Model
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 from tensorflow.keras.losses import MeanSquaredError
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -266,14 +266,28 @@ class LSTMStockPredictor:
           print("Training new model...")
           print(f"Input shape: {X.shape}")
 
-          self.model = Sequential([
-              LSTM(64, return_sequences=True, input_shape=(X.shape[1], X.shape[2])),
-              Dropout(0.2),
-              LSTM(32, return_sequences=False),
-              Dropout(0.2),
-              Dense(16, activation='relu'),
-              Dense(1)
-          ])
+          # Use explicit layer creation to avoid TensorFlow compatibility issues
+          
+          # Create input layer explicitly 
+          inputs = Input(shape=(X.shape[1], X.shape[2]))
+          
+          # Create LSTM layers with explicit configuration
+          x = LSTM(64, return_sequences=True,
+                  recurrent_dropout=0.0,
+                  dropout=0.0,
+                  stateful=False,
+                  unroll=False)(inputs)
+          x = Dropout(0.2)(x)
+          x = LSTM(32, return_sequences=False,
+                  recurrent_dropout=0.0,
+                  dropout=0.0,
+                  stateful=False,
+                  unroll=False)(x)
+          x = Dropout(0.2)(x)
+          x = Dense(16, activation='relu')(x)
+          outputs = Dense(1)(x)
+          
+          self.model = Model(inputs=inputs, outputs=outputs)
           self.model.compile(optimizer='adam', loss='mse')
 
           # Train model
