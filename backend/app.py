@@ -56,7 +56,7 @@ def train_model():
         if IS_PRODUCTION:
             try:
                 if model_type == 'lstm_v2':
-                    predictor_check = LSTMStockPredictor('models/lstm_50_stocks_model.keras', seq_length)
+                    predictor_check = LSTMStockPredictor('models/lstm_50_stocks_model.h5', seq_length)
                     if not predictor_check.can_predict_without_training(tickers, start_date, end_date):
                         return jsonify({
                             'error': f'Model training disabled in production. Please use date ranges within the trained model bounds: {predictor_check.training_start_date} to {predictor_check.training_end_date}',
@@ -66,7 +66,7 @@ def train_model():
                         }), 400
                         
                 elif model_type == 'lstm_vertige':
-                    predictor_check = VertigeLSTMPredictor('models/lstm_vertige_model.keras', seq_length)
+                    predictor_check = VertigeLSTMPredictor('models/lstm_vertige_model.h5', seq_length)
                     if not predictor_check.can_predict_without_training(tickers, start_date, end_date):
                         return jsonify({
                             'error': 'Vertige model requires exact matching tickers and dates within training range in production.',
@@ -120,7 +120,7 @@ def stream_updates():
             if model_type == 'lstm_vertige':
                 yield 'data: {"progress": "Initializing LSTM Vertige predictor..."}\n\n'
                 time.sleep(1)
-                predictor = VertigeLSTMPredictor('models/lstm_vertige_model.keras', seq_length)
+                predictor = VertigeLSTMPredictor('models/lstm_vertige_model.h5', seq_length)
                 
                 # Store current dates for metadata
                 predictor._current_start_date = start_date
@@ -143,7 +143,7 @@ def stream_updates():
             else:  # lstm_v2
                 yield 'data: {"progress": "Initializing LSTM v2 predictor..."}\n\n'
                 time.sleep(1)
-                predictor = LSTMStockPredictor('models/lstm_50_stocks_model.keras', seq_length)
+                predictor = LSTMStockPredictor('models/lstm_50_stocks_model.h5', seq_length)
                 
                 # Check if we can use existing model for prediction only
                 if predictor.can_predict_without_training(tickers, start_date, end_date):
@@ -245,9 +245,9 @@ def check_model_compatibility():
         
         # Create temporary predictor instance to check compatibility
         if model_type == 'lstm_vertige':
-            temp_predictor = VertigeLSTMPredictor('models/lstm_vertige_model.keras', seq_length)
+            temp_predictor = VertigeLSTMPredictor('models/lstm_vertige_model.h5', seq_length)
         else:
-            temp_predictor = LSTMStockPredictor('models/lstm_50_stocks_model.keras', seq_length)
+            temp_predictor = LSTMStockPredictor('models/lstm_50_stocks_model.h5', seq_length)
         
         can_predict = temp_predictor.can_predict_without_training(tickers, start_date, end_date)
         
@@ -284,9 +284,9 @@ def check_model_compatibility():
 def health_check():
     import os
     model_files_exist = {
-        'v2_model': os.path.exists('models/lstm_50_stocks_model.keras'),
+        'v2_model': os.path.exists('models/lstm_50_stocks_model.h5'),
         'v2_metadata': os.path.exists('models/lstm_50_stocks_model_metadata.json'),
-        'vertige_model': os.path.exists('models/lstm_vertige_model.keras'),
+        'vertige_model': os.path.exists('models/lstm_vertige_model.h5'),
         'vertige_metadata': os.path.exists('models/lstm_vertige_model_metadata.json'),
         'models_dir': os.path.exists('models')
     }

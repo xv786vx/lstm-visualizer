@@ -53,7 +53,8 @@ class LSTMStockPredictor:
         self.features = ['Close', 'Daily Return', '50MA', '200MA',
                         'Volatility', 'RSI', 'VWAP', '20EMA']
         self.training_tickers = None
-        self.model_metadata_path = model_path.replace('.keras', '_metadata.json')
+        # Set up file paths for model and metadata
+        self.model_metadata_path = model_path.replace('.keras', '_metadata.json').replace('.h5', '_metadata.json')
         
         # Fixed list of top 50 S&P 500 stocks for consistent input dimensions
         self.TOP_50_SP500 = [

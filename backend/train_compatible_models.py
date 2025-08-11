@@ -20,7 +20,7 @@ def create_compatible_50_stock_model():
     print("=" * 60)
     
     # Use explicit constructor to ensure compatibility
-    predictor = LSTMPredictor50('models/lstm_50_stocks_model.keras', seq_length=30)
+    predictor = LSTMPredictor50('models/lstm_50_stocks_model.h5', seq_length=30)
     
     # Clear any existing model
     predictor._clear_model()
@@ -44,7 +44,7 @@ def create_compatible_vertige_model():
     print("=" * 60)
     
     # Use explicit constructor to ensure compatibility
-    predictor = LSTMPredictorVertige('models/lstm_vertige_model.keras', seq_length=30)
+    predictor = LSTMPredictorVertige('models/lstm_vertige_model.h5', seq_length=30)
     
     # Clear any existing model
     predictor._clear_model()

@@ -72,7 +72,7 @@ class LSTMStockPredictor:
         self.features = ['Close', 'Daily Return', '50MA', '200MA',
                         'Volatility', 'RSI', 'VWAP', '20EMA']
         self.training_tickers = None
-        self.model_metadata_path = model_path.replace('.keras', '_metadata.json')
+        self.model_metadata_path = model_path.replace('.keras', '_metadata.json').replace('.h5', '_metadata.json')
 
         # Load model and check if it matches current tickers
         self._load_model_if_compatible()
