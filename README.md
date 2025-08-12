@@ -1,6 +1,6 @@
 # LSTM Stock Predictor
 
-A multi-stock LSTM-based stock prediction and backtesting application with portfolio management capabilities.
+A multi-stock LSTM-based stock prediction and backtesting application.
 
 ## Features
 
@@ -15,8 +15,8 @@ A multi-stock LSTM-based stock prediction and backtesting application with portf
 
 - **Backend**: Flask API with LSTM model training and prediction
 - **Frontend**: React with Tailwind CSS for modern UI
-- **Model**: Multi-stock LSTM with dropout regularization
-- **Data**: Yahoo Finance API for real-time stock data
+- **Model**: Multi-stock TensorFlow model with LSTM, Dense and Dropout layers
+- **Data**: Yahoo Finance API for historical stock data
 
 ## Setup
 
@@ -38,8 +38,8 @@ npm start
 
 ## Usage
 
-1. Select up to 8 stocks from the provided list
-2. Choose sequence length (20-40 days)
+1. Select a desired model (LSTM v2 or LSTM Vertige)
+2. Choose sequence length (10-100 days)
 3. Set date range (default: 2020-01-01 to 2025-01-01)
 4. Click "Generate Predictions"
 5. View performance metrics and prediction plots
@@ -55,7 +55,7 @@ npm start
 
 The LSTM model uses:
 
-- Sequence length: 20-40 days (user configurable)
+- Sequence length: 10-100 days (user configurable)
 - Features: Close price, daily returns, 50MA, 200MA, volatility, RSI, VWAP, 20EMA
 - Architecture: LSTM(64) → Dropout(0.2) → LSTM(32) → Dropout(0.2) → Dense(16) → Dense(1)
 - Training: Adam optimizer, MSE loss, 20 epochs
