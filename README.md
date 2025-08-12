@@ -19,6 +19,12 @@ A multi-stock LSTM-based stock prediction and backtesting application.
 - **Data**: Yahoo Finance API for historical stock data
 
 ## Setup
+### Clone Repository 
+```bash
+git clone https://github.com/xv786vx/lstm-visualizer
+cd lstm-visualizer
+```
+
 
 ### Backend
 
