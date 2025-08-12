@@ -158,7 +158,7 @@ class LSTMStockPredictor:
             return False
         
         # Check if tickers match exactly
-        if not self._tickers_match(tickers):
+        if not self._tickers_match(tickers) or len(tickers) == 0:
             return False
             
         # Check if date range is compatible

@@ -51,7 +51,7 @@
     "WMT",
     "XOM"
   ],
-  "seq_length": 30,
+  "seq_length": 60,
   "features": [
     "Close",
     "Daily Return",
@@ -62,7 +62,7 @@
     "VWAP",
     "20EMA"
   ],
-  "training_start_date": "2010-01-01",
-  "training_end_date": "2024-12-31",
-  "created_at": "2025-08-11 09:55:50.742537"
+  "training_start_date": "2020-01-01",
+  "training_end_date": "2025-01-01",
+  "created_at": "2025-08-12 11:26:00.345578"
 }

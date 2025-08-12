@@ -1,5 +1,70 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import "./App.css";
+
+// TOP 50 S&P 500 stocks (matches lstm_strategy_v2.py)
+const TOP_50_SP500 = [
+  "AAPL",
+  "MSFT",
+  "AMZN",
+  "GOOGL",
+  "NVDA",
+  "TSLA",
+  "META",
+  "NFLX",
+  "JPM",
+  "JNJ",
+  "V",
+  "PG",
+  "UNH",
+  "HD",
+  "MA",
+  "DIS",
+  "PYPL",
+  "ADBE",
+  "CRM",
+  "INTC",
+  "VZ",
+  "CMCSA",
+  "PFE",
+  "ABT",
+  "KO",
+  "PEP",
+  "TMO",
+  "COST",
+  "WMT",
+  "MRK",
+  "BAC",
+  "XOM",
+  "CVX",
+  "LLY",
+  "ABBV",
+  "ORCL",
+  "WFC",
+  "BMY",
+  "MDT",
+  "ACN",
+  "DHR",
+  "TXN",
+  "QCOM",
+  "HON",
+  "IBM",
+  "AMGN",
+  "UPS",
+  "LOW",
+  "SBUX",
+  "CAT",
+];
+
+// Vertige model stocks (matches lstm_strategy_Vertige.py)
+const VERTIGE_STOCKS = [
+  "AAPL",
+  "MSFT",
+  "AMZN",
+  "GOOGL",
+  "NVDA",
+  "TSLA",
+  "META",
+];
 
 function App() {
   const [selectedModel, setSelectedModel] = React.useState("");
@@ -10,18 +75,10 @@ function App() {
   const [metrics, setMetrics] = React.useState({});
   const [loading, setLoading] = React.useState(null);
   const [error, setError] = React.useState(null);
-  const [isConnecting, setIsConnecting] = React.useState(true);
-  const [connectionError, setConnectionError] = React.useState(false);
   const [modelCompatibility, setModelCompatibility] = React.useState(null);
-  const [startupProgress, setStartupProgress] = React.useState({
-    current_step: "Connecting to backend...",
-    progress_percent: 0,
-    steps_completed: 0,
-    total_steps: 6,
-  });
 
-  const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
-  // const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
+  // const REACT_APP_API_URL = "https://lstm-visualizer-backend.onrender.com"; // for deployment
+  const REACT_APP_API_URL = "http://localhost:4999"; // for local testing
 
   // Available model types
   const modelTypes = [
@@ -37,71 +94,6 @@ function App() {
       description:
         "Original LSTM model with 7 specific stocks, technical indicators, and portfolio backtesting. Sequence length: 30 days.",
     },
-  ];
-
-  // TOP 50 S&P 500 stocks (matches lstm_strategy_v2.py)
-  const TOP_50_SP500 = [
-    "AAPL",
-    "MSFT",
-    "AMZN",
-    "GOOGL",
-    "NVDA",
-    "TSLA",
-    "META",
-    "NFLX",
-    "JPM",
-    "JNJ",
-    "V",
-    "PG",
-    "UNH",
-    "HD",
-    "MA",
-    "DIS",
-    "PYPL",
-    "ADBE",
-    "CRM",
-    "INTC",
-    "VZ",
-    "CMCSA",
-    "PFE",
-    "ABT",
-    "KO",
-    "PEP",
-    "TMO",
-    "COST",
-    "WMT",
-    "MRK",
-    "BAC",
-    "XOM",
-    "CVX",
-    "LLY",
-    "ABBV",
-    "ORCL",
-    "WFC",
-    "BMY",
-    "MDT",
-    "ACN",
-    "DHR",
-    "TXN",
-    "QCOM",
-    "HON",
-    "IBM",
-    "AMGN",
-    "UPS",
-    "LOW",
-    "SBUX",
-    "CAT",
-  ];
-
-  // Vertige model stocks (matches lstm_strategy_Vertige.py)
-  const VERTIGE_STOCKS = [
-    "AAPL",
-    "MSFT",
-    "AMZN",
-    "GOOGL",
-    "NVDA",
-    "TSLA",
-    "META",
   ];
 
   // Get available stocks based on selected model
@@ -124,133 +116,23 @@ function App() {
     return 0;
   };
 
-  const listenToStartupProgress = useCallback(() => {
-    const eventSource = new EventSource(
-      `${REACT_APP_API_URL}/startup-progress`
-    );
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setStartupProgress(data);
-
-      if (data.is_ready) {
-        setIsConnecting(false);
-        setConnectionError(false);
-        eventSource.close();
-      }
-    };
-
-    eventSource.onerror = () => {
-      console.log("Startup progress stream error, falling back to polling");
-      eventSource.close();
-      // Fall back to polling health endpoint with a simple function
-      setTimeout(() => {
-        // Simple health check without calling the callback to avoid dependency
-        fetch(`${REACT_APP_API_URL}/health`)
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.ready) {
-              setIsConnecting(false);
-              setConnectionError(false);
-            } else {
-              setConnectionError(true);
-              // Keep trying
-              setTimeout(() => {
-                fetch(`${REACT_APP_API_URL}/health`)
-                  .then((r) => r.json())
-                  .then((d) => {
-                    if (d.ready) {
-                      setIsConnecting(false);
-                      setConnectionError(false);
-                    }
-                  })
-                  .catch(() => {});
-              }, 3000);
-            }
-          })
-          .catch(() => {
-            setConnectionError(true);
-          });
-      }, 3000);
-    };
-
-    // Cleanup on unmount
-    return () => {
-      eventSource.close();
-    };
-  }, [REACT_APP_API_URL]);
-
-  const checkBackendHealth = useCallback(async () => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-      const response = await fetch(`${REACT_APP_API_URL}/health`, {
-        method: "GET",
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-
-        if (data.ready) {
-          // Backend is fully ready
-          setIsConnecting(false);
-          setConnectionError(false);
-          setStartupProgress({
-            current_step: "Backend ready!",
-            progress_percent: 100,
-            steps_completed: data.total_steps || 6,
-            total_steps: data.total_steps || 6,
-          });
-        } else {
-          // Backend is initializing, start listening to progress
-          setConnectionError(false);
-          setStartupProgress({
-            current_step: data.current_step || "Initializing...",
-            progress_percent: data.progress_percent || 0,
-            steps_completed: data.steps_completed || 0,
-            total_steps: data.total_steps || 6,
-          });
-
-          // Start listening to startup progress stream
-          listenToStartupProgress();
-        }
-      } else {
-        throw new Error("Backend not responding");
-      }
-    } catch (error) {
-      console.log("Backend not ready, retrying in 5 seconds...");
-      setConnectionError(true);
-      setStartupProgress({
-        current_step: "Connecting to backend...",
-        progress_percent: 0,
-        steps_completed: 0,
-        total_steps: 6,
-      });
-      // Retry after 5 seconds
-      setTimeout(checkBackendHealth, 5000);
+  // Set selected tickers when model changes
+  useEffect(() => {
+    if (selectedModel === "lstm_vertige") {
+      setSelectedTickers(VERTIGE_STOCKS); // Auto-select all 7 Vertige stocks
+    } else {
+      setSelectedTickers([]); // Clear for other models
     }
-  }, [REACT_APP_API_URL, listenToStartupProgress]);
-
-  useEffect(() => {
-    // Check backend health on component mount
-    checkBackendHealth();
-
-    // Set default dates: 2020-01-01 to 2025-01-01
-    setStartDate("2020-01-01");
-    setEndDate("2025-01-01");
-    // Set default model
-    setSelectedModel("lstm_v2");
-  }, [checkBackendHealth]);
-
-  // Clear selected tickers when model changes
-  useEffect(() => {
-    setSelectedTickers([]);
     setError(null);
   }, [selectedModel]);
+
+  // Auto-set dates when model is selected
+  useEffect(() => {
+    if (selectedModel && (!startDate || !endDate)) {
+      setStartDate("2020-01-01");
+      setEndDate("2025-01-01");
+    }
+  }, [selectedModel, startDate, endDate]);
 
   const handleTickerToggle = (ticker) => {
     const maxStocks = getMaxStocks();
@@ -276,17 +158,23 @@ function App() {
   // Check compatibility when relevant parameters change
   React.useEffect(() => {
     const checkCompatibility = async () => {
-      if (
-        !selectedModel ||
-        selectedTickers.length === 0 ||
-        !startDate ||
-        !endDate
-      ) {
+      console.log("Checking compatibility:", {
+        selectedModel,
+        tickerCount: selectedTickers.length,
+        startDate,
+        endDate,
+      });
+
+      if (!selectedModel || selectedTickers.length === 0) {
         setModelCompatibility(null);
         return;
       }
 
       try {
+        console.log(
+          "Fetching model info from:",
+          `${REACT_APP_API_URL}/model/compatibility`
+        );
         const response = await fetch(
           `${REACT_APP_API_URL}/model/compatibility`,
           {
@@ -299,18 +187,54 @@ function App() {
               tickers: selectedTickers,
               start_date: startDate,
               end_date: endDate,
-              seq_length: selectedModel === "lstm_vertige" ? 30 : 30, // Both use 30
+              seq_length: 60,
             }),
           }
         );
-
         if (response.ok) {
-          const compatibility = await response.json();
-          setModelCompatibility(compatibility);
+          const modelInfo = await response.json();
+          console.log("Model info received:", modelInfo);
+
+          // Check if the selected model exists
+          const modelExists = modelInfo.model_exists;
+
+          console.log("Model exists:", modelExists);
+
+          if (modelExists) {
+            // Use the compatibility info directly from the backend response
+            setModelCompatibility({
+              compatible: modelInfo.compatible,
+              model_exists: true,
+              training_start_date: modelInfo.training_start_date,
+              training_end_date: modelInfo.training_end_date,
+              training_tickers: modelInfo.training_tickers,
+              message: modelInfo.compatible
+                ? "Existing model is compatible"
+                : "Model parameters have changed - retraining required",
+            });
+          } else {
+            setModelCompatibility({
+              compatible: false,
+              model_exists: false,
+              message:
+                "No existing model found - New model will be trained for your selection.",
+            });
+          }
+        } else {
+          console.log("Failed to fetch model info, status:", response.status);
+          setModelCompatibility({
+            compatible: false,
+            model_exists: false,
+            message: `Backend error: ${response.status}`,
+          });
         }
       } catch (error) {
-        console.log("Could not check model compatibility:", error);
-        setModelCompatibility(null);
+        console.log("Could not check model info:", error);
+        setModelCompatibility({
+          compatible: false,
+          model_exists: false,
+          message: "Could not connect to backend",
+        });
       }
     };
 
@@ -320,11 +244,6 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (isConnecting) {
-      setError("Still connecting to backend. Please wait...");
-      return;
-    }
 
     if (!selectedModel) {
       setError("Please select a model type");
@@ -363,22 +282,9 @@ function App() {
 
     if (!response.ok) {
       const errorData = await response.json();
-
-      if (response.status === 503) {
-        // Backend is still initializing
-        setError(
-          `Backend is still initializing: ${
-            errorData.current_step || "Please wait..."
-          }`
-        );
-        setIsConnecting(true); // Go back to connecting state
-        // Start checking backend health again
-        setTimeout(checkBackendHealth, 2000);
-      } else {
-        setError(
-          errorData.error || "Error generating prediction. Please check inputs"
-        );
-      }
+      setError(
+        errorData.error || "Error generating prediction. Please check inputs"
+      );
       setLoading(false);
       return;
     }
@@ -430,7 +336,6 @@ function App() {
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                disabled={isConnecting}
                 className="w-full p-2 bg-neutral-800 text-neutral-200 border border-neutral-600 rounded focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 required>
                 <option value="">Choose a model...</option>
@@ -450,8 +355,8 @@ function App() {
               )}
             </div>
 
-            {/* Stock Selection - Only show if model is selected */}
-            {selectedModel && (
+            {/* Stock Selection - Only show for LSTM v2 model */}
+            {selectedModel && selectedModel === "lstm_v2" && (
               <div className="flex-1 min-h-0">
                 <label className="block text-neutral-200 text-sm font-bold mb-2">
                   Select Stocks ({selectedTickers.length}/{getMaxStocks()}):
@@ -467,7 +372,6 @@ function App() {
                       key={ticker}
                       type="button"
                       onClick={() => handleTickerToggle(ticker)}
-                      disabled={isConnecting}
                       className={`py-1.5 px-2 text-xs rounded border disabled:opacity-50 disabled:cursor-not-allowed text-center ${
                         selectedTickers.includes(ticker)
                           ? "bg-blue-600 text-white border-blue-600"
@@ -487,6 +391,30 @@ function App() {
               </div>
             )}
 
+            {/* Stock Info for Vertige model - shows fixed stocks */}
+            {selectedModel && selectedModel === "lstm_vertige" && (
+              <div className="flex-shrink-0">
+                <label className="block text-neutral-200 text-sm font-bold mb-2">
+                  Vertige Model Stocks:
+                  <span className="text-neutral-400 text-xs block mt-1">
+                    This model uses a fixed set of 7 pre-trained stocks
+                  </span>
+                </label>
+                <div className="grid grid-cols-3 gap-1 border border-neutral-600 rounded p-2 bg-neutral-800">
+                  {VERTIGE_STOCKS.map((ticker) => (
+                    <div
+                      key={ticker}
+                      className="py-1.5 px-2 text-xs rounded border bg-blue-600 text-white border-blue-600 text-center">
+                      {ticker}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-neutral-400 text-sm mt-2">
+                  Stocks: {VERTIGE_STOCKS.join(", ")}
+                </p>
+              </div>
+            )}
+
             {/* Date Selection - Only show if model is selected */}
             {selectedModel && (
               <>
@@ -502,7 +430,6 @@ function App() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    disabled={isConnecting}
                     className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                     required
                   />
@@ -520,7 +447,6 @@ function App() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    disabled={isConnecting}
                     className="appearance-none border-b-2 border-neutral-200 w-full py-2 px-3 text-neutral-200 leading-tight focus:outline-none focus:border-neutral-500 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                     required
                   />
@@ -529,35 +455,44 @@ function App() {
                 {/* Model Compatibility Status */}
                 {modelCompatibility && (
                   <div className="col-span-2 mt-4">
-                    {modelCompatibility.compatible ? (
+                    {modelCompatibility.compatible &&
+                    modelCompatibility.model_exists ? (
                       <div className="bg-green-800/30 border border-green-500 text-green-200 px-3 py-2 rounded text-sm">
-                        ✅ <strong>Existing model can be used!</strong> No
-                        training required - predictions will be much faster.
+                        ✅ <strong>Existing model found!</strong> Ready for
+                        predictions.
                         {modelCompatibility.training_start_date && (
                           <div className="text-xs mt-1">
                             Model trained on:{" "}
                             {modelCompatibility.training_start_date} to{" "}
                             {modelCompatibility.training_end_date}
-                          </div>
-                        )}
-                      </div>
-                    ) : modelCompatibility.model_exists ? (
-                      <div className="bg-yellow-800/30 border border-yellow-500 text-yellow-200 px-3 py-2 rounded text-sm">
-                        ⚠️ <strong>Model exists but needs retraining</strong>
-                        {modelCompatibility.incompatibility_reasons && (
-                          <div className="text-xs mt-1">
-                            {modelCompatibility.incompatibility_reasons.map(
-                              (reason, idx) => (
-                                <div key={idx}>• {reason}</div>
-                              )
+                            {modelCompatibility.training_tickers && (
+                              <div className="mt-1">
+                                Trained with:{" "}
+                                {modelCompatibility.training_tickers.length}{" "}
+                                stocks
+                              </div>
                             )}
                           </div>
                         )}
                       </div>
-                    ) : (
+                    ) : !modelCompatibility.model_exists ? (
                       <div className="bg-blue-800/30 border border-blue-500 text-blue-200 px-3 py-2 rounded text-sm">
                         ℹ️ <strong>No existing model found</strong> - New model
                         will be trained for your selection.
+                        {modelCompatibility.message && (
+                          <div className="text-xs mt-1">
+                            {modelCompatibility.message}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-yellow-800/30 border border-yellow-500 text-yellow-200 px-3 py-2 rounded text-sm">
+                        ⚠️ <strong>Model needs retraining</strong>
+                        {modelCompatibility.message && (
+                          <div className="text-xs mt-1">
+                            {modelCompatibility.message}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -572,72 +507,22 @@ function App() {
           <button
             type="submit"
             onClick={handleSubmit}
-            disabled={
-              isConnecting || !selectedModel || selectedTickers.length === 0
-            }
+            disabled={!selectedModel || selectedTickers.length === 0}
             className="bg-neutral-300 hover:bg-neutral-100 disabled:bg-neutral-700 disabled:text-neutral-500 text-black font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline w-full">
-            {isConnecting
-              ? `Backend Initializing... (${startupProgress.progress_percent}%)`
-              : !selectedModel
+            {!selectedModel
               ? "Select Model First"
               : selectedTickers.length === 0
-              ? `Select ${
-                  selectedModel === "lstm_vertige" ? "Vertige" : "V2"
-                } Stocks First`
-              : "Generate Predictions"}
+                ? `Select ${
+                    selectedModel === "lstm_vertige" ? "Vertige" : "V2"
+                  } Stocks First`
+                : "Generate Predictions"}
           </button>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-600 scrollbar-track-neutral-800">
-        {isConnecting ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center max-w-md">
-              <div className="spinner mb-10"></div>
-
-              <h2 className="text-xl font-semibold text-neutral-200 mb-4">
-                {connectionError
-                  ? "Connecting to Backend..."
-                  : "Initializing Backend"}
-              </h2>
-
-              {!connectionError && (
-                <div className="mb-4">
-                  <div className="bg-neutral-700 rounded-full h-3 mb-2">
-                    <div
-                      className="bg-blue-500 h-3 rounded-full transition-all duration-300 ease-out"
-                      style={{
-                        width: `${startupProgress.progress_percent}%`,
-                      }}></div>
-                  </div>
-
-                  <p className="text-neutral-300 text-sm mb-2">
-                    {startupProgress.current_step}
-                  </p>
-
-                  <p className="text-neutral-400 text-xs">
-                    Step {startupProgress.steps_completed} of{" "}
-                    {startupProgress.total_steps}(
-                    {startupProgress.progress_percent}%)
-                  </p>
-                </div>
-              )}
-
-              <p className="text-neutral-400 text-sm">
-                {connectionError
-                  ? "Attempting to connect to the server..."
-                  : "This may take up to 3-4 minutes on first startup"}
-              </p>
-
-              {connectionError && (
-                <p className="text-yellow-400 text-xs mt-2">
-                  The server may be starting up. Please wait...
-                </p>
-              )}
-            </div>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div className="text-center">
             <h1 className="mt-4 text-neutral-200 font-bold text-lg">
               {loading}

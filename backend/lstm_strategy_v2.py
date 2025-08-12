@@ -123,7 +123,7 @@ class LSTMStockPredictor:
 
     def _tickers_match(self, new_tickers):
         """Check if new tickers are a subset of the 50 stocks the model was trained on"""
-        if self.training_tickers is None:
+        if self.training_tickers is None or len(new_tickers) == 0:
             return False
         # For the fixed 50-stock model, check if it was trained on all 50 stocks
         return sorted(self.training_tickers) == sorted(self.TOP_50_SP500)

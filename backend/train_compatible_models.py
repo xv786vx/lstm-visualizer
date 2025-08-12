@@ -20,17 +20,17 @@ def create_compatible_50_stock_model():
     print("=" * 60)
     
     # Use explicit constructor to ensure compatibility
-    predictor = LSTMPredictor50('models/lstm_50_stocks_model.h5', seq_length=30)
+    predictor = LSTMPredictor50('models/lstm_50_stocks_model.h5', seq_length=60)
     
     # Clear any existing model
     predictor._clear_model()
     
     # Force training from scratch with full date range
-    predictor._current_start_date = "2010-01-01"
-    predictor._current_end_date = "2024-12-31"
+    predictor._current_start_date = "2020-01-01"
+    predictor._current_end_date = "2025-01-01"
     
     # Train on first stock to trigger model creation
-    X_test, y_test = predictor.train_model_on_all_50_stocks(start_date='2010-01-01', end_date='2024-12-31')
+    X_test, y_test = predictor.train_model_on_all_50_stocks(start_date='2020-01-01', end_date='2025-01-01')
     
     print(f"Model saved successfully!")
     print(f"Model file size: {os.path.getsize(predictor.model_path) / 1024:.1f} KB")
@@ -53,12 +53,12 @@ def create_compatible_vertige_model():
     vertige_stocks = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA']
     
     # Force training from scratch with full date range
-    predictor._current_start_date = "2010-01-01"
-    predictor._current_end_date = "2024-12-31"
+    predictor._current_start_date = "2020-01-01"
+    predictor._current_end_date = "2025-01-01"
     
     # Train the model using the correct workflow
     print("Fetching and preparing data...")
-    data = predictor.fetch_and_prepare_data(vertige_stocks, "2010-01-01", "2024-12-31")
+    data = predictor.fetch_and_prepare_data(vertige_stocks, "2020-01-01", "2025-01-01")
     normalized_data = predictor.normalize_data(data)
     predictor.training_tickers = vertige_stocks  # Store training tickers
     X, y, _ = predictor.create_sequences(normalized_data, vertige_stocks)
@@ -89,8 +89,8 @@ def main():
         print("Both models have been retrained with TensorFlow compatibility fixes.")
         print("Models should now work correctly on Render's TensorFlow environment.")
         print("\nNext steps:")
-        print("1. Commit and push these new model files")
-        print("2. Wait for Render to deploy")
+        print("1. Restart local backend with 'python app.py' (Make sure you're in the backend directory)")
+        print("2. Refresh local frontend (or start it) with 'npm start' or 'npm run dev' (make sure you're in the frontend directory)")
         print("3. Test the frontend to verify green compatibility status")
         
     except Exception as e:
