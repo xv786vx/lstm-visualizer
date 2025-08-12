@@ -195,13 +195,21 @@ def check_model_compatibility():
         tickers = data.get('tickers', [])
         start_date = data.get('start_date')
         end_date = data.get('end_date')
-        seq_length = data.get('seq_length', 60)
+        seq_length = data.get('seq_length')
         
         # Create temporary predictor instance to check compatibility
         if model_type == 'lstm_vertige':
             temp_predictor = VertigeLSTMPredictor('models/lstm_vertige_model.h5', seq_length)
         else:
             temp_predictor = LSTMStockPredictor('models/lstm_50_stocks_model.h5', seq_length)
+        
+        # Debug logging
+        print(f"Compatibility check - Model: {model_type}, Requested seq_length: {seq_length}")
+        print(f"Model exists: {temp_predictor.model is not None}")
+        if hasattr(temp_predictor, 'training_seq_length'):
+            print(f"Training seq_length: {temp_predictor.training_seq_length}")
+        else:
+            print("No training_seq_length attribute found")
         
         can_predict = temp_predictor.can_predict_without_training(tickers, start_date, end_date)
         
@@ -210,7 +218,9 @@ def check_model_compatibility():
             'model_exists': temp_predictor.model is not None,
             'training_tickers': temp_predictor.training_tickers,
             'training_start_date': getattr(temp_predictor, 'training_start_date', None),
-            'training_end_date': getattr(temp_predictor, 'training_end_date', None)
+            'training_end_date': getattr(temp_predictor, 'training_end_date', None),
+            'training_seq_length': getattr(temp_predictor, 'training_seq_length', None),
+            'requested_seq_length': seq_length
         }
         
         if not can_predict and temp_predictor.model is not None:
@@ -226,6 +236,10 @@ def check_model_compatibility():
             
             if not temp_predictor._date_range_compatible(start_date, end_date):
                 reasons.append(f"Date range {start_date} to {end_date} is outside training range {temp_predictor.training_start_date} to {temp_predictor.training_end_date}")
+            
+            # Check sequence length compatibility
+            if hasattr(temp_predictor, 'training_seq_length') and temp_predictor.training_seq_length != seq_length:
+                reasons.append(f"Sequence length mismatch: model trained with {temp_predictor.training_seq_length} days, requested {seq_length} days")
             
             response['incompatibility_reasons'] = reasons
         

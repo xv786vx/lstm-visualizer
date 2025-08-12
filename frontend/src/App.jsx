@@ -71,6 +71,7 @@ function App() {
   const [selectedTickers, setSelectedTickers] = React.useState([]);
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
+  const [seqLength, setSeqLength] = React.useState(30); // Default sequence length
   const [plotUrls, setPlotUrls] = React.useState([]);
   const [metrics, setMetrics] = React.useState({});
   const [loading, setLoading] = React.useState(null);
@@ -86,13 +87,13 @@ function App() {
       value: "lstm_v2",
       label: "LSTM v2 (50-Stock Architecture)",
       description:
-        "Advanced LSTM with fixed 50-stock input dimensions, one-hot encoding, and optimized for S&P 500 stocks. Sequence length: 30 days.",
+        "Advanced LSTM with fixed 50-stock input dimensions, one-hot encoding, and optimized for S&P 500 stocks. Configurable sequence length.",
     },
     {
       value: "lstm_vertige",
       label: "LSTM Vertige (7-Stock Architecture)",
       description:
-        "Original LSTM model with 7 specific stocks, technical indicators, and portfolio backtesting. Sequence length: 30 days.",
+        "Original LSTM model with 7 specific stocks, technical indicators, and portfolio backtesting. Configurable sequence length.",
     },
   ];
 
@@ -187,7 +188,7 @@ function App() {
               tickers: selectedTickers,
               start_date: startDate,
               end_date: endDate,
-              seq_length: 60,
+              seq_length: seqLength,
             }),
           }
         );
@@ -210,7 +211,7 @@ function App() {
               training_tickers: modelInfo.training_tickers,
               message: modelInfo.compatible
                 ? "Existing model is compatible"
-                : "Model parameters have changed - retraining required",
+                : "Model parameters have changed - old model will be wiped and new model will be trained",
             });
           } else {
             setModelCompatibility({
@@ -240,7 +241,14 @@ function App() {
 
     const timeoutId = setTimeout(checkCompatibility, 500); // Debounce
     return () => clearTimeout(timeoutId);
-  }, [selectedModel, selectedTickers, startDate, endDate, REACT_APP_API_URL]);
+  }, [
+    selectedModel,
+    selectedTickers,
+    startDate,
+    endDate,
+    seqLength,
+    REACT_APP_API_URL,
+  ]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -265,6 +273,7 @@ function App() {
       tickers: selectedTickers,
       start_date: startDate,
       end_date: endDate,
+      seq_length: seqLength,
     });
 
     const response = await fetch(`${REACT_APP_API_URL}/train`, {
@@ -277,6 +286,7 @@ function App() {
         tickers: selectedTickers,
         start_date: startDate,
         end_date: endDate,
+        seq_length: seqLength,
       }),
     });
 
@@ -452,6 +462,40 @@ function App() {
                   />
                 </div>
 
+                {/* Sequence Length */}
+                <div className="flex-shrink-0">
+                  <label
+                    htmlFor="seq-length"
+                    className="block text-neutral-200 text-sm font-bold mb-2">
+                    Sequence Length: {seqLength} days
+                    <span className="text-neutral-400 text-xs block mt-1">
+                      Number of days to look back for predictions (range:
+                      10-100)
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="seq-length"
+                      type="range"
+                      min="10"
+                      max="100"
+                      step="5"
+                      value={seqLength}
+                      onChange={(e) => setSeqLength(parseInt(e.target.value))}
+                      className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer slider"
+                      style={{
+                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((seqLength - 10) / (100 - 10)) * 100}%, #374151 ${((seqLength - 10) / (100 - 10)) * 100}%, #374151 100%)`,
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-neutral-400 mt-1">
+                      <span>10</span>
+                      <span>40</span>
+                      <span>70</span>
+                      <span>100</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Model Compatibility Status */}
                 {modelCompatibility && (
                   <div className="col-span-2 mt-4">
@@ -469,7 +513,9 @@ function App() {
                               <div className="mt-1">
                                 Trained with:{" "}
                                 {modelCompatibility.training_tickers.length}{" "}
-                                stocks
+                                stocks, seq length:{" "}
+                                {modelCompatibility.training_seq_length ||
+                                  "unknown"}
                               </div>
                             )}
                           </div>
@@ -493,6 +539,16 @@ function App() {
                             {modelCompatibility.message}
                           </div>
                         )}
+                        {modelCompatibility.training_seq_length &&
+                          modelCompatibility.training_seq_length !==
+                            modelCompatibility.requested_seq_length && (
+                            <div className="text-xs mt-1">
+                              Sequence length mismatch: trained with{" "}
+                              {modelCompatibility.training_seq_length} days,
+                              requested{" "}
+                              {modelCompatibility.requested_seq_length} days
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>

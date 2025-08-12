@@ -87,8 +87,10 @@ class LSTMStockPredictor:
                     self.training_tickers = metadata.get('training_tickers', [])
                     self.training_start_date = metadata.get('training_start_date')
                     self.training_end_date = metadata.get('training_end_date')
+                    self.training_seq_length = metadata.get('seq_length', self.seq_length)
                     print(f"Found existing model trained on: {self.training_tickers}")
                     print(f"Training date range: {self.training_start_date} to {self.training_end_date}")
+                    print(f"Training sequence length: {self.training_seq_length}")
                     
                 self.model = load_model(self.model_path)
                 print(f"Loaded existing model from {self.model_path}")
@@ -100,6 +102,7 @@ class LSTMStockPredictor:
             self.training_tickers = None
             self.training_start_date = None
             self.training_end_date = None
+            self.training_seq_length = None
 
     def _clear_model(self):
         """Clear existing model and metadata files"""
@@ -113,6 +116,8 @@ class LSTMStockPredictor:
         self.training_tickers = None
         self.training_start_date = None
         self.training_end_date = None
+        self.training_seq_length = None
+        self.training_seq_length = None
 
     def _save_model_metadata(self, tickers, start_date=None, end_date=None):
         """Save metadata about the model including training tickers and date range"""
@@ -162,7 +167,18 @@ class LSTMStockPredictor:
             return False
             
         # Check if date range is compatible
-        return self._date_range_compatible(start_date, end_date)
+        if not self._date_range_compatible(start_date, end_date):
+            return False
+            
+        # Check if sequence length matches (new check)
+        print(f"Sequence length check - has training_seq_length: {hasattr(self, 'training_seq_length')}")
+        if hasattr(self, 'training_seq_length'):
+            print(f"training_seq_length: {self.training_seq_length}, current seq_length: {self.seq_length}")
+        if hasattr(self, 'training_seq_length') and self.training_seq_length != self.seq_length:
+            print(f"Sequence length mismatch: {self.training_seq_length} != {self.seq_length}")
+            return False
+            
+        return True
 
 
     def fetch_and_prepare_data(self, tickers, start_date, end_date):
